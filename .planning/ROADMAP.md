@@ -15,14 +15,14 @@
 **Plans:** 4 plans in 4 waves
 
 Plans:
-- [ ] 01-PLAN.md — Project Foundation (Android + Backend setup) — Wave 1
-- [ ] 02-PLAN.md — Backend Room System (REST API + WebSocket signaling) — Wave 2
+- [x] 01-PLAN.md — Project Foundation (Android + Backend setup) — Wave 1
+- [x] 02-PLAN.md — Backend Room System (REST API + WebSocket signaling) — Wave 2
 - [ ] 03-PLAN.md — Android Room UI (Creation, Joining, Participants) — Wave 3
 - [ ] 04-PLAN.md — WebRTC Voice Chat (Integration, Controls, Status) — Wave 4
 
 ### Deliverables
-- [ ] Backend: Room management API (create, join, leave, list)
-- [ ] Backend: WebSocket signaling server for WebRTC
+- [x] Backend: Room management API (create, join, leave, list)
+- [x] Backend: WebSocket signaling server for WebRTC
 - [ ] Android: Room creation flow
 - [ ] Android: Room joining via ID/link
 - [ ] Android: Participant list UI

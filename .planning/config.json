@@ -1,0 +1,51 @@
+{
+  "projectName": "CineSync",
+  "version": "1.0.0",
+  "created": "2026-03-25",
+  "workflow": {
+    "mode": "auto",
+    "skipResearch": false,
+    "skipQuestioning": true
+  },
+  "platform": {
+    "primary": "Android",
+    "language": "Kotlin",
+    "minSdk": 24,
+    "targetSdk": 34
+  },
+  "phases": [
+    {
+      "phase": 1,
+      "name": "Room System + Voice Chat",
+      "status": "pending",
+      "priority": "high"
+    },
+    {
+      "phase": 2,
+      "name": "Video Playback + Sync",
+      "status": "pending",
+      "priority": "high"
+    },
+    {
+      "phase": 3,
+      "name": "Local Video Streaming",
+      "status": "pending",
+      "priority": "medium"
+    },
+    {
+      "phase": 4,
+      "name": "Screen Sharing",
+      "status": "pending",
+      "priority": "low"
+    }
+  ],
+  "constraints": {
+    "maxUsersPerRoom": 4,
+    "noFileUploads": true,
+    "p2pStreaming": true
+  },
+  "state": {
+    "currentPhase": 0,
+    "lastUpdated": "2026-03-25"
+  }
+}

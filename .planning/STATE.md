@@ -6,7 +6,7 @@
 |----------|-------|
 | Project | CineSync |
 | Phase | 1 - Room System + Voice Chat |
-| Status | Plan 04 Complete (Voice Chat - Awaiting Verification) |
+| Status | Plan 01 Complete (Project Foundation) |
 | Last Updated | 2026-03-25 |
 
 ---
@@ -27,11 +27,11 @@
 **Next:** Phase 1 - Room System + Voice Chat
 
 ### Phase 1 Checklist
-- [x] Set up Node.js backend project (Plan 01, 02)
+- [x] Set up Node.js backend project (Plan 01) ✅
 - [x] Implement Socket.io server for signaling (Plan 02)
 - [x] Create room management API endpoints (Plan 02)
-- [x] Set up Android project with Kotlin + Jetpack Compose (foundation)
-- [x] Configure Hilt dependency injection (foundation)
+- [x] Set up Android project with Kotlin + Jetpack Compose (Plan 01) ✅
+- [x] Configure Hilt dependency injection (Plan 01) ✅
 - [x] Build room creation UI flow (Plan 03)
 - [x] Build room joining UI flow (Plan 03)
 - [x] Integrate WebRTC for voice chat (Plan 04)

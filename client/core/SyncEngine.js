@@ -72,32 +72,24 @@ export class SyncEngine {
 
     const container = document.getElementById(this.containerId);
 
-    if (this.currentSource === source) {
+    // If same source and player exists, just re-attach if needed
+    if (this.currentSource === source && this.player) {
       if (source === 'screen') {
         this.currentSourceValue = value;
-        if (this.player && this.player.video && container) {
-          if (!container.contains(this.player.video)) {
-            container.innerHTML = '';
-            container.appendChild(this.player.video);
-          }
+        if (this.player.video && container && !container.contains(this.player.video)) {
+          container.innerHTML = '';
+          container.appendChild(this.player.video);
           this.player.play();
         }
+        this._isLoadingSource = false;
         return;
       } else if (this.currentSourceValue === value) {
-        if (this.player && this.player.video && container) {
-          if (!container.contains(this.player.video)) {
-            container.innerHTML = '';
-            container.appendChild(this.player.video);
-            this.player.play();
-          }
-        } else if (source === 'youtube' && this.player && container) {
-          if (!container.querySelector('iframe')) {
-            this.player.destroy();
-            const onEvent = (type, data) => this.onPlayerEvent(type, data);
-            this.player = new YouTubePlayer(this.containerId, onEvent);
-            this.player.load(value);
-          }
+        if (this.player.video && container && !container.contains(this.player.video)) {
+          container.innerHTML = '';
+          container.appendChild(this.player.video);
+          this.player.play();
         }
+        this._isLoadingSource = false;
         return;
       }
     }
@@ -251,6 +243,7 @@ export class SyncEngine {
   }
 
   tryApplyPendingSource() {
+    console.log('[SyncEngine] tryApplyPendingSource called, _pendingSource:', this._pendingSource);
     if (!this._pendingSource) return;
     
     // Don't apply if we're already loading the same source
@@ -317,5 +310,9 @@ export class SyncEngine {
       }
       onReady();
     }
+    
+    // Reset loading flags after player creation
+    this._isLoadingSource = false;
+    this._isLoadingScreen = false;
   }
 }

@@ -159,7 +159,20 @@ export class PeerManager {
 
   removeCallReference(userId, type) {
     const calls = this.calls.get(userId);
-    if (calls) {
+    if (calls && calls[type]) {
+      const call = calls[type];
+      
+      // Remove event listeners to prevent memory leaks
+      call.off('stream');
+      call.off('close');
+      
+      // Close the call connection
+      try {
+        call.close();
+      } catch (e) {
+        // Ignore errors when closing stale connections
+      }
+      
       delete calls[type];
       if (Object.keys(calls).length === 0) {
         this.calls.delete(userId);
@@ -167,6 +180,7 @@ export class PeerManager {
         this.calls.set(userId, calls);
       }
     }
+  }
   }
 
   startScreenShare(stream, remoteUserIds) {

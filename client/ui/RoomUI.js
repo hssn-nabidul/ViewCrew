@@ -1,3 +1,4 @@
+import { escapeHtml, escapeAttr } from './utils/sanitize.js';
 export const RoomUI = {
   currentTab: 'watch', // 'watch' | 'chat' | 'people' | 'settings' | 'source'  
   sidebarTab: 'chat', // 'chat' | 'people'
@@ -119,7 +120,7 @@ export const RoomUI = {
               <input id="inputLobbyDisplayName"
                      class="w-full h-16 bg-background border border-white/10 rounded-2xl px-6 text-on-surface focus:ring-2 focus:ring-primary/50 transition-all outline-none text-center font-bold text-lg"
                      type="text"
-                     value="${displayName}"
+                     value="${escapeAttr(displayName)}"
                      placeholder="Enter Name..."/>
             </div>
 
@@ -287,7 +288,7 @@ export const RoomUI = {
                   </div>
                 </div>
                 <div>
-                  <p class="font-black text-xs text-on-surface tracking-tight">${p.displayName}${p.userId === userId || p.id === userId ? ' <span class="text-primary/60">(You)</span>' : ''}</p>
+                  <p class="font-black text-xs text-on-surface tracking-tight">${escapeHtml(p.displayName)}${p.userId === userId || p.id === userId ? ' <span class="text-primary/60">(You)</span>' : ''}</p>
                   <p class="text-[8px] font-black uppercase tracking-[0.2em] text-on-surface-variant/40 mt-0.5">
                     ${p.isHost ? 'Commander' : 'Crew Member'}
                   </p>
@@ -326,7 +327,7 @@ export const RoomUI = {
           <div class="space-y-6">
             <div class="space-y-2 text-left">
               <label class="text-[10px] font-black uppercase tracking-[0.2em] text-on-surface-variant/40 ml-4">Manifest Identity</label>
-              <input id="inputSettingsDisplayName" class="w-full h-16 bg-surface border border-white/5 rounded-2xl px-6 text-on-surface font-bold text-lg focus:ring-2 focus:ring-primary/50 outline-none transition-all" type="text" value="${me?.displayName || ''}"/>
+              <input id="inputSettingsDisplayName" class="w-full h-16 bg-surface border border-white/5 rounded-2xl px-6 text-on-surface font-bold text-lg focus:ring-2 focus:ring-primary/50 outline-none transition-all" type="text" value="${escapeAttr(me?.displayName || '')}"/>
             </div>
           </div>
         </section>
@@ -405,7 +406,7 @@ export const RoomUI = {
       return `
         <div class="flex flex-col items-end gap-2 self-end max-w-[90%]">
           <div class="bg-primary text-on-primary px-5 py-4 rounded-3xl rounded-tr-none shadow-xl shadow-primary/10">
-            <p class="text-[13px] font-bold leading-relaxed tracking-tight">${msg.message}</p>
+            <p class="text-[13px] font-bold leading-relaxed tracking-tight">${escapeHtml(msg.message)}</p>
           </div>
           <div class="flex items-center gap-2 mr-1">
             <span class="text-[8px] font-black uppercase tracking-widest text-on-surface-variant/40">${timeStr}</span>
@@ -423,9 +424,9 @@ export const RoomUI = {
           </div>
         </div>
         <div class="flex flex-col gap-2">
-          <span class="text-[8px] font-black uppercase tracking-[0.2em] text-on-surface-variant/40 ml-2">${msg.displayName}</span>
+          <span class="text-[8px] font-black uppercase tracking-[0.2em] text-on-surface-variant/40 ml-2">${escapeHtml(msg.displayName)}</span>
           <div class="bg-white/5 text-on-surface px-5 py-4 rounded-3xl rounded-tl-none shadow-xl border border-white/5">
-            <p class="text-[13px] font-bold leading-relaxed tracking-tight">${msg.message}</p>
+            <p class="text-[13px] font-bold leading-relaxed tracking-tight">${escapeHtml(msg.message)}</p>
           </div>
           <span class="text-[8px] font-black uppercase tracking-widest text-on-surface-variant/20 ml-2">${timeStr}</span>
         </div>

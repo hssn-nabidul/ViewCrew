@@ -322,5 +322,39 @@ export class SyncEngine {
     // Reset loading flags after player creation
     this._isLoadingSource = false;
     this._isLoadingScreen = false;
+
+  cleanup() {
+    console.log('[SyncEngine] Cleaning up resources...');
+    
+    // Clear pending timeouts
+    if (this._sourceLoadedTimeout) {
+      clearTimeout(this._sourceLoadedTimeout);
+      this._sourceLoadedTimeout = null;
+    }
+    
+    // Remove socket listener
+    if (this.socket) {
+      this.socket.off('sync-event');
+    }
+    
+    // Remove live badge
+    const badge = document.getElementById('live-badge');
+    if (badge) badge.remove();
+    
+    // Destroy player if exists
+    if (this.player) {
+      this.player.destroy();
+      this.player = null;
+    }
+    
+    // Reset state
+    this.currentSource = null;
+    this.currentSourceValue = null;
+    this._pendingSource = null;
+    this._pendingStream = null;
+    this._isLoadingSource = false;
+    this._isLoadingScreen = false;
+    
+    console.log('[SyncEngine] Cleanup complete');
   }
-}
+};

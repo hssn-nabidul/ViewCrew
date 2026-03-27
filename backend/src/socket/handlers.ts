@@ -106,21 +106,28 @@ export function setupSocketHandlers(io: Server): void {
       relayToUser(io, socketData.roomId, data.targetId, 'ice-candidate', data);
     });
 
+
     // sync-event: Relay playback control from host to viewers
     socket.on('sync-event', (data: { roomId: string; type: string; time: number; source?: string; sourceValue?: string }) => {
       const { roomId, ...payload } = data;
       const normalizedRoomId = roomId.toUpperCase();
       
-      // Update room state for screen sharing
       const room = getRoom(normalizedRoomId);
-      if (room) {
-        if (payload.type === 'source-change') {
-          room.isScreenSharing = payload.source === 'screen';
-          room.screenSharingUserId = room.isScreenSharing ? payload.sourceValue : undefined;
-        }
+      if (!room) {
+        socket.emit('error', { code: 'ROOM_NOT_FOUND', message: 'Room not found' });
+        return;
+      }
+      
+      if (room.hostId !== socketData.userId) {
+        socket.emit('error', { code: 'NOT_HOST', message: 'Only the host can send sync events' });
+        return;
+      }
+      
+      if (payload.type === 'source-change') {
+        room.isScreenSharing = payload.source === 'screen';
+        room.screenSharingUserId = room.isScreenSharing ? payload.sourceValue : undefined;
       }
 
-      // In a real app, verify that the sender is the host
       socket.to(normalizedRoomId).emit('sync-event', payload);
     });
 
@@ -128,12 +135,19 @@ export function setupSocketHandlers(io: Server): void {
       const { roomId, userId, displayName } = data;
       const normalizedRoomId = roomId.toUpperCase();
       const room = getRoom(normalizedRoomId);
+      
+      if (socketData.userId !== userId) {
+        socket.emit('error', { code: 'UNAUTHORIZED', message: 'Cannot update another user\'s name' });
+        return;
+      }
+      
       if (room) {
         const participant = room.participants.get(userId);
         if (participant) {
-          participant.displayName = displayName;
-          socketData.displayName = displayName;
-          io.to(normalizedRoomId).emit('display-name-updated', { userId, displayName });
+          const sanitizedName = String(displayName).trim().substring(0, 30);
+          participant.displayName = sanitizedName;
+          socketData.displayName = sanitizedName;
+          io.to(normalizedRoomId).emit('display-name-updated', { userId, displayName: sanitizedName });
         }
       }
     });

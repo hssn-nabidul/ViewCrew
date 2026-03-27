@@ -286,4 +286,37 @@ export class RoomManager {
       }
     }
   }
-}
+
+  destroy() {
+    console.log('[RoomManager] Cleaning up resources...');
+    
+    if (this._refreshTimeout) {
+      clearTimeout(this._refreshTimeout);
+      this._refreshTimeout = null;
+    }
+    
+    if (this.socket) {
+      this.socket.off('connect');
+      this.socket.off('room-state');
+      this.socket.off('user-joined');
+      this.socket.off('user-left');
+      this.socket.off('sync-event');
+      this.socket.off('chat-message');
+      this.socket.off('display-name-updated');
+      this.socket.off('user-speaking');
+      this.socket.off('leave-room');
+      this.socket.off('disconnect');
+    }
+    
+    if (this.peerManager) {
+      this.peerManager.destroy();
+    }
+    
+    this.participants = [];
+    this.syncEngine = null;
+    this.roomId = null;
+    this.userId = null;
+    
+    console.log('[RoomManager] Cleanup complete');
+  }
+};

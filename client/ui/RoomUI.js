@@ -3,7 +3,11 @@ export const RoomUI = {
   seekAnimationFrame: null,
   chatMessages: [],
 
-  render: (roomId, participants, userId, currentSource) => {
+  render: (roomId, participants, userId, currentSource, hasEnteredTheater) => {
+    if (!hasEnteredTheater) {
+      return RoomUI.renderLobbyView(participants, userId, roomId);
+    }
+
     const isLobby = !currentSource;
     const isHost = participants.find(p => p.userId === userId || p.id === userId)?.isHost;
     
@@ -64,35 +68,51 @@ export const RoomUI = {
   },
 
   renderLobbyView: (participants, userId, roomId) => {
+    const me = participants.find(p => p.userId === userId || p.id === userId);
+    const displayName = me ? me.displayName : '';
+
     return `
-      <div class="flex-1 flex flex-col px-6 pt-4 pb-8">
-        <!-- Hero Section -->
-        <section class="mb-10 text-center md:text-left">
-          <h2 class="text-[3.5rem] leading-[1.1] font-headline font-extrabold tracking-tighter mb-4 text-on-surface">
-            Interstellar
-          </h2>
-          <p class="text-on-surface-variant font-medium text-sm leading-relaxed max-w-xs mx-auto md:mx-0">
-            Waiting for Host to initiate the cinematic sequence. Grab your popcorn and settle in.
-          </p>
-        </section>
+      <div class="min-h-screen bg-surface flex items-center justify-center p-6">
+        <div class="w-full max-w-sm bg-surface-container-low rounded-[2rem] p-8 shadow-2xl border border-white/5 flex flex-col items-center text-center space-y-8">
+          
+          <div class="space-y-2">
+            <h2 class="text-2xl font-headline font-extrabold tracking-tight text-on-surface">Theater Gate</h2>
+            <p class="text-on-surface-variant text-[10px] font-bold tracking-[0.2em] uppercase">Identify yourself, traveler</p>
+          </div>
 
-        <!-- Participant Bento Grid (2x2 Mobile) -->
-        <div id="lobbyParticipantGrid" class="grid grid-cols-2 gap-4 flex-1 content-start">
-          ${RoomUI.renderLobbyParticipants(participants, userId)}
-        </div>
-
-        <!-- Action Area -->
-        <div class="mt-8 space-y-4">
-          <button class="w-full h-14 bg-gradient-to-r from-primary to-primary-container rounded-xl font-bold tracking-tight text-on-primary shadow-2xl shadow-primary/20 active:scale-95 duration-200 transition-all uppercase text-sm">
-            READY TO WATCH
-          </button>
-          <!-- Room Metadata -->
-          <div class="flex items-center justify-between px-2">
-            <div class="flex items-center gap-2">
-              <div class="w-2 h-2 rounded-full bg-tertiary animate-pulse"></div>
-              <span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant font-medium">LIVE SYNC ENABLED</span>
+          <div class="relative group">
+            <div class="w-24 h-24 rounded-full bg-gradient-to-tr from-primary/20 to-primary-container/20 p-1">
+              <div class="w-full h-full rounded-full bg-surface-container-high flex items-center justify-center text-4xl font-bold text-primary border border-white/5">
+                ${displayName.charAt(0) || '?'}
+              </div>
             </div>
-            <span class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant/60">CONNECTED</span>
+            <div class="absolute -bottom-1 -right-1 w-8 h-8 bg-primary rounded-full flex items-center justify-center text-on-primary shadow-lg">
+              <span class="material-symbols-outlined text-sm">edit</span>
+            </div>
+          </div>
+
+          <div class="w-full space-y-6">
+            <div class="space-y-2">
+              <label for="inputLobbyDisplayName" class="text-[10px] font-bold uppercase tracking-[0.15em] text-on-surface-variant/60 block text-left ml-4">Your Stage Name</label>
+              <input id="inputLobbyDisplayName" 
+                     class="w-full h-14 bg-surface-container-highest/50 border border-white/5 rounded-2xl px-6 text-on-surface focus:ring-2 focus:ring-primary/50 transition-all outline-none text-center font-medium" 
+                     type="text" 
+                     value="${displayName}" 
+                     placeholder="Enter Name..."/>
+            </div>
+            
+            <button id="btnEnterTheater" 
+                    class="w-full h-16 bg-primary text-on-primary font-bold rounded-2xl active:scale-[0.97] transition-all flex items-center justify-center gap-3 shadow-xl shadow-primary/20 uppercase tracking-[0.2em] text-[10px]">
+              <span>Enter Theater</span>
+              <span class="material-symbols-outlined text-sm">rocket_launch</span>
+            </button>
+          </div>
+
+          <div class="pt-2">
+            <div class="flex items-center gap-2 px-4 py-2 bg-surface-container-highest rounded-full border border-white/5">
+              <span class="w-1.5 h-1.5 rounded-full bg-tertiary animate-pulse"></span>
+              <span class="text-[9px] font-bold uppercase tracking-widest text-on-surface-variant/80">Room: ${roomId}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -619,6 +639,24 @@ export const RoomUI = {
         if (file) {
           RoomUI.currentTab = 'watch';
           roomManager.syncEngine.changeSource('local', URL.createObjectURL(file), roomManager.roomId);
+        }
+      };
+    }
+
+    // Lobby / Waiting Room Listeners
+    const btnEnter = document.querySelector('#btnEnterTheater');
+    if (btnEnter) {
+      btnEnter.onclick = () => {
+        const nameInput = document.querySelector('#inputLobbyDisplayName');
+        const name = nameInput ? nameInput.value.trim() : '';
+        if (name) roomManager.updateDisplayName(name);
+        
+        if (roomManager.enterTheater) {
+          roomManager.enterTheater();
+        } else {
+          // Fallback state if not yet implemented in core
+          roomManager.hasEnteredTheater = true;
+          if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
         }
       };
     }

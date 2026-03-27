@@ -617,6 +617,9 @@ export const RoomUI = {
             roomManager.hasEnteredTheater = true;
           }
           
+          // Switch to watch view (in case user had source selector open)
+          RoomUI.currentTab = 'watch';
+          
           // Set pending source directly on syncEngine to update state before re-render
           if (roomManager.syncEngine) {
             roomManager.syncEngine._pendingSource = { source: 'local', value: blobUrl };

@@ -322,6 +322,7 @@ export class SyncEngine {
     // Reset loading flags after player creation
     this._isLoadingSource = false;
     this._isLoadingScreen = false;
+  }
 
   cleanup() {
     console.log('[SyncEngine] Cleaning up resources...');

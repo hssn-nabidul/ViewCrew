@@ -17,13 +17,31 @@ export class HTMLVideoPlayer extends PlayerInterface {
     if (!this.video) {
       console.log('[HTMLVideoPlayer] Creating video element');
       this.video = document.createElement('video');
+      
+      // MOBILE FIX: Set attributes BEFORE adding to DOM
+      this.video.controls = false;
+      this.video.playsInline = true;
+      this.video.autoplay = true;
+      this.video.muted = false; // Must be false so the host can hear the local video
+      
+      // iOS Safari specific attributes
+      this.video.setAttribute('playsinline', '');
+      this.video.setAttribute('webkit-playsinline', '');
+      this.video.setAttribute('x5-playsinline', '');
+      this.video.setAttribute('x5-video-player-type', 'h5');
+      this.video.setAttribute('x5-video-player-fullscreen', 'false');
+      this.video.setAttribute('disablePictureInPicture', '');
+      this.video.setAttribute('disableRemotePlayback', '');
+      
       this.video.style.width = '100%';
       this.video.style.height = '100%';
       this.video.style.position = 'relative';
       this.video.style.zIndex = '10';
-      this.video.controls = false;
-      this.video.playsInline = true;
-      this.video.muted = false; // Must be false so the host can hear the local video
+      
+      // MOBILE FIX: GPU acceleration for mobile
+      this.video.style.transform = 'translateZ(0)';
+      this.video.style.webkitTransform = 'translateZ(0)';
+      this.video.style.willChange = 'transform';
       
       this.video.onplay = () => {
         console.log('[HTMLVideoPlayer] Video playing');

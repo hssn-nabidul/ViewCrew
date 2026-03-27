@@ -4,6 +4,7 @@ const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
   { urls: 'stun:stun2.l.google.com:19302' },
+  // Free TURN fallback — handles mobile CGNAT where STUN alone fails
   {
     urls: 'turn:openrelay.metered.ca:80',
     username: 'openrelayproject',
@@ -26,14 +27,27 @@ export class PeerManager {
     this.userId = userId;
     const url = new URL(apiUrl);
 
+    // MOBILE FIX: Detect mobile for adjusted settings
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
     this.peer = new Peer(userId, {
       host: url.hostname,
       port: url.port || (url.protocol === 'https:' ? 443 : 80),
       path: '/peerjs',
+      // FIX 1: Explicit ICE config — PeerJS default STUN is unreliable on
+      // mobile networks (carrier-grade NAT). Without TURN, video streams
+      // silently fail on ~30% of mobile connections.
       config: {
         iceServers: ICE_SERVERS,
-        iceTransportPolicy: 'all'
-      }
+        iceTransportPolicy: 'all',
+        // MOBILE FIX: More aggressive ICE gathering for mobile
+        iceCandidatePoolSize: isMobile ? 10 : 5,
+        // MOBILE FIX: Bundle policy for better mobile compatibility
+        bundlePolicy: 'max-bundle',
+        rtcpMuxPolicy: 'require'
+      },
+      // MOBILE FIX: Add debug logging on mobile
+      debug: isMobile ? 2 : 0
     });
 
     this.localStream = null;
@@ -59,11 +73,19 @@ export class PeerManager {
       console.log(`[PeerManager] Receiving ${type} call from: ${call.peer}`);
 
       if (type === 'audio') {
+        // FIX: Never pass null to call.answer(). When mic permission is denied,
+        // this.localStream is null. Passing null to PeerJS causes it to fail the
+        // entire RTCPeerConnection — which then also breaks the screen share call
+        // because the peer is in a broken state. An empty MediaStream is safe:
+        // it tells PeerJS "I accept this call, I just have nothing to send back."
         call.answer(this.localStream || new MediaStream());
       } else {
-        // FIX: Some browsers require a more active SDP answer for video streams.
-        // We still send an empty stream to avoid sending our own video back,
-        // but we ensure it's handled as a proper receive-only connection.
+        // FIX 2: Pass an empty MediaStream instead of nothing.
+        // call.answer() with no args causes PeerJS to skip video codec
+        // negotiation in the SDP answer. The ICE connection succeeds but
+        // the video track is never transferred — producing a permanent black screen.
+        // An empty MediaStream forces proper video negotiation while still
+        // making this a receive-only connection.
         call.answer(new MediaStream());
       }
 
@@ -83,30 +105,89 @@ export class PeerManager {
       return;
     }
 
-    console.log(`[PeerManager] Calling ${remoteUserId} (${type}) with ${stream.getTracks().length} tracks`);
-    const call = this.peer.call(remoteUserId, stream, { metadata: { type } });
+    // CRITICAL FIX: Verify stream has active tracks before calling
+    const tracks = stream.getTracks();
+    if (tracks.length === 0) {
+      console.warn(`[PeerManager] Cannot call ${type} — stream has no tracks`);
+      return;
+    }
+
+    const liveTracks = tracks.filter(t => t.readyState === 'live');
+    console.log(`[PeerManager] Calling ${remoteUserId} (${type}) with ${liveTracks.length}/${tracks.length} live tracks`);
+
+    // MOBILE FIX: Add SDP constraints for better mobile compatibility
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const options = {
+      metadata: { type },
+      // MOBILE FIX: Constraints for better mobile video compatibility
+      constraints: {
+        mandatory: {
+          OfferToReceiveAudio: true,
+          OfferToReceiveVideo: true
+        },
+        optional: [
+          { googHighpassFilter: false },
+          { googEchoCancellation: false },
+          { googAutoGainControl: false },
+          { googNoiseSuppression: false }
+        ]
+      },
+      // MOBILE FIX: SDP transform to prefer compatible codecs
+      sdpTransform: isMobile ? (sdp) => {
+        // Prefer H.264 for mobile (better compatibility than VP8/VP9)
+        // This regex moves H264 to the front of the m=video line
+        const h264Regex = /(a=rtpmap:\d+ H264\/\d+)/;
+        const match = sdp.match(h264Regex);
+        if (match) {
+          const payloadType = match[0].match(/\d+/)[0];
+          // Reorder payload types to prefer H264
+          sdp = sdp.replace(/(m=video \d+ [A-Z]+\/TLS\/RTP\/SAVPF )(.+)/, (match, prefix, payloads) => {
+            const payloadList = payloads.split(' ');
+            const h264Index = payloadList.indexOf(payloadType);
+            if (h264Index > 0) {
+              payloadList.splice(h264Index, 1);
+              payloadList.unshift(payloadType);
+              return prefix + payloadList.join(' ');
+            }
+            return match;
+          });
+        }
+        return sdp;
+      } : undefined
+    };
+
+    const call = this.peer.call(remoteUserId, stream, options);
     this.handleCall(call, type);
   }
 
   handleCall(call, type) {
     const remoteUserId = call.peer;
 
+    // FIX: If we already have a screen call from this peer, close the old one first.
+    // This prevents overlapping WebRTC connections which cause Android Chrome to
+    // receive a second stream but fail to render it (showing a black screen).
     const existingCalls = this.calls.get(remoteUserId);
     if (existingCalls && existingCalls[type]) {
-      console.log(`[PeerManager] Closing existing ${type} call from ${remoteUserId}`);
+      console.log(`[PeerManager] Closing existing ${type} call from ${remoteUserId} before handling new one`);
       try {
         existingCalls[type].close();
-      } catch (e) {}
+      } catch (e) {
+        // Ignore close errors on stale calls
+      }
       delete existingCalls[type];
     }
 
     call.on('stream', (remoteStream) => {
-      const trackCount = remoteStream.getTracks().length;
-      console.log(`[PeerManager] Received remote ${type} stream from ${remoteUserId} with ${trackCount} tracks`);
+      console.log(`[PeerManager] Received remote ${type} stream from: ${remoteUserId}`);
 
-      // FIX: Do NOT ignore empty streams here. In WebRTC, tracks can be added
-      // asynchronously after the 'stream' event fires. The ScreenPlayer now
-      // handles onaddtrack internally to detect when video actually arrives.
+      // FIX 3: Guard against empty streams from the fix above.
+      // The empty MediaStream we send in answer() comes back here on the
+      // caller's side — ignore it since it has no tracks.
+      if (type === 'screen' && remoteStream.getTracks().length === 0) {
+        console.log('[PeerManager] Ignoring empty stream from screen share answer');
+        return;
+      }
+
       if (this.onRemoteStream) {
         this.onRemoteStream(remoteUserId, remoteStream, type);
       }
@@ -136,6 +217,21 @@ export class PeerManager {
   }
 
   startScreenShare(stream, remoteUserIds) {
+    // CRITICAL FIX: Validate stream before storing
+    if (!stream) {
+      console.error('[PeerManager] startScreenShare called with null stream');
+      return;
+    }
+
+    const videoTracks = stream.getVideoTracks();
+    const audioTracks = stream.getAudioTracks();
+    console.log(`[PeerManager] Starting screen share with ${videoTracks.length} video, ${audioTracks.length} audio tracks`);
+
+    if (videoTracks.length === 0) {
+      console.error('[PeerManager] Cannot start screen share — no video tracks in stream');
+      return;
+    }
+
     this.screenStream = stream;
     remoteUserIds.forEach(id => {
       if (id !== this.userId) {
@@ -147,7 +243,7 @@ export class PeerManager {
   stopScreenShare() {
     this.calls.forEach((calls) => {
       if (calls.screen) {
-        try { calls.screen.close(); } catch(e) {}
+        calls.screen.close();
       }
     });
     if (this.screenStream) {
@@ -158,8 +254,8 @@ export class PeerManager {
 
   destroy() {
     this.calls.forEach(calls => {
-      if (calls.audio) try { calls.audio.close(); } catch(e) {}
-      if (calls.screen) try { calls.screen.close(); } catch(e) {}
+      if (calls.audio) calls.audio.close();
+      if (calls.screen) calls.screen.close();
     });
     this.calls.clear();
     if (this.peer) this.peer.destroy();

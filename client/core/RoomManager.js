@@ -19,6 +19,8 @@ export class RoomManager {
     this.roomId = null;
     this.participants = [];
     this.onStateChange = null;
+
+    // FIX: Buffer for screen stream that arrives before SyncEngine is ready
     this._pendingScreenStream = null;
 
     this.setupListeners();
@@ -33,17 +35,22 @@ export class RoomManager {
         console.log('[RoomManager] Screen stream received from peer:', remoteUserId);
 
         if (this.syncEngine) {
+          // SyncEngine exists — attach immediately
           this.syncEngine.attachScreenStream(remoteStream);
         } else {
+          // FIX: SyncEngine not ready yet — buffer the stream
+          // It will be flushed as soon as room-state creates the SyncEngine
           console.warn('[RoomManager] SyncEngine not ready, buffering screen stream');
           this._pendingScreenStream = remoteStream;
         }
       }
     };
 
+    // FIX: Handle remote screen stream removal (host stopped sharing or call closed)
     this.peerManager.onRemoteStreamRemoved = (remoteUserId, type) => {
       if (type === 'screen') {
         console.log('[RoomManager] Screen stream removed from peer:', remoteUserId);
+        // Clear any buffered stream as it's now stale
         this._pendingScreenStream = null;
       }
     };
@@ -78,6 +85,10 @@ export class RoomManager {
     }
     if (audio.srcObject !== remoteStream) {
       audio.srcObject = remoteStream;
+      // FIX: The `autoplay` attribute alone is blocked by Android Chrome's
+      // autoplay policy. We must call .play() explicitly. If it still fails
+      // (edge cases), we silently swallow the error — the user simply won't
+      // hear that participant, which is better than crashing.
       audio.play().catch(err => {
         console.warn(`[RoomManager] Audio autoplay blocked for ${remoteUserId}:`, err);
       });
@@ -131,10 +142,12 @@ export class RoomManager {
         this.syncEngine.roomId = this.roomId;
       }
 
+      // If screen share is active and we are a viewer, load the screen source
       if (state.isScreenSharing && state.screenSharingUserId !== this.userId) {
         this.syncEngine.loadSource('screen', state.screenSharingUserId);
       }
 
+      // FIX: Flush any buffered screen stream now that SyncEngine exists
       if (this._pendingScreenStream) {
         console.log('[RoomManager] Flushing buffered screen stream to SyncEngine');
         this.syncEngine.attachScreenStream(this._pendingScreenStream);
@@ -278,13 +291,29 @@ export class RoomManager {
     };
   }
 
-  refreshLocalStream(videoElement, retries = 5) {
+  refreshLocalStream(videoElement, retries = 8) {
     try {
-      // FIX: Ensure video is actually playing and rendering before capturing.
-      // ReadyState 2+ means at least the current frame is available.
-      if ((videoElement.videoWidth === 0 || videoElement.readyState < 2) && retries > 0) {
-        console.log('[RoomManager] Waiting for video to be ready before capturing...');
-        setTimeout(() => this.refreshLocalStream(videoElement, retries - 1), 1000);
+      // MOBILE FIX: Ensure video is actually playing before capturing
+      if (videoElement.paused) {
+        console.log('[RoomManager] Video is paused, attempting to play before capture...');
+        videoElement.play().catch(e => console.warn('[RoomManager] Could not auto-play video:', e));
+      }
+
+      // MOBILE FIX: On mobile, videoWidth might be 0 initially even when playing
+      // We need to wait longer for mobile browsers
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const requiredWidth = isMobile ? 10 : 0; // Mobile can have smaller initial dimensions
+      
+      if (videoElement.videoWidth <= requiredWidth && retries > 0) {
+        console.log(`[RoomManager] Waiting for video dimensions (current: ${videoElement.videoWidth}x${videoElement.videoHeight}, mobile: ${isMobile})...`);
+        setTimeout(() => this.refreshLocalStream(videoElement, retries - 1), isMobile ? 300 : 500);
+        return;
+      }
+
+      // MOBILE FIX: Ensure video is ready state >= 3 (HAVE_FUTURE_DATA)
+      if (videoElement.readyState < 3 && retries > 0) {
+        console.log(`[RoomManager] Waiting for video ready state (current: ${videoElement.readyState})...`);
+        setTimeout(() => this.refreshLocalStream(videoElement, retries - 1), 300);
         return;
       }
 
@@ -297,6 +326,36 @@ export class RoomManager {
         return;
       }
 
+      // CRITICAL FIX: Verify the captured stream has active tracks
+      const videoTracks = stream.getVideoTracks();
+      const audioTracks = stream.getAudioTracks();
+      console.log(`[RoomManager] Captured stream: ${videoTracks.length} video tracks, ${audioTracks.length} audio tracks`);
+
+      if (videoTracks.length === 0) {
+        console.warn('[RoomManager] No video tracks in captured stream, retrying...');
+        if (retries > 0) {
+          setTimeout(() => this.refreshLocalStream(videoElement, retries - 1), isMobile ? 300 : 500);
+        }
+        return;
+      }
+
+      // Check if tracks are actually live/enabled
+      const hasLiveTrack = videoTracks.some(t => t.readyState === 'live' && t.enabled);
+      if (!hasLiveTrack) {
+        console.warn('[RoomManager] Video tracks exist but none are live/enabled, retrying...');
+        if (retries > 0) {
+          setTimeout(() => this.refreshLocalStream(videoElement, retries - 1), isMobile ? 300 : 500);
+        }
+        return;
+      }
+
+      // MOBILE FIX: Longer delay for mobile to ensure clean peer connection state
+      const cleanupDelay = isMobile ? 800 : 500;
+      
+      // FIX: Stop old screen share connections first, then wait briefly for
+      // old PeerJS calls to clean up before establishing new ones. Without the
+      // delay, viewers on Android receive overlapping calls and the second
+      // stream's video never renders (black screen).
       this.peerManager.stopScreenShare();
       setTimeout(() => {
         this.peerManager.startScreenShare(stream, this.participants.map(p => p.userId));
@@ -309,11 +368,12 @@ export class RoomManager {
           time: videoElement.currentTime
         });
         console.log('[RoomManager] Local stream captured and shared successfully.');
-      }, 1000);
+      }, 500);
     } catch (err) {
       console.error('[RoomManager] captureStream error:', err);
       if (retries > 0) {
-        setTimeout(() => this.refreshLocalStream(videoElement, retries - 1), 1000);
+        console.log(`[RoomManager] Retrying capture... (${retries} left)`);
+        setTimeout(() => this.refreshLocalStream(videoElement, retries - 1), 500);
       }
     }
   }

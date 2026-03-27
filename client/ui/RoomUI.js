@@ -1,4 +1,4 @@
-import { escapeHtml, escapeAttr } from './utils/sanitize.js';
+import { escapeHtml, escapeAttr } from '../utils/sanitize.js';
 export const RoomUI = {
   currentTab: 'watch', // 'watch' | 'chat' | 'people' | 'settings' | 'source'  
   sidebarTab: 'chat', // 'chat' | 'people'

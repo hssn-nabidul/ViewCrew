@@ -484,13 +484,18 @@ export const RoomUI = {
     const videoContainer = document.querySelector('#video-container');
     if (videoSection && videoControls) {
       let hideTimeout;
+      let lastShowTime = 0;
       const showControls = () => {
-        videoControls.classList.remove('opacity-0', 'pointer-events-none');
-        videoControls.classList.add('opacity-100');
+        const now = Date.now();
+        if (now - lastShowTime < 100) return;
+        lastShowTime = now;
+        
+        videoControls.style.opacity = '1';
+        videoControls.style.pointerEvents = 'auto';
         clearTimeout(hideTimeout);
         hideTimeout = setTimeout(() => {
-          videoControls.classList.remove('opacity-100');
-          videoControls.classList.add('opacity-0', 'pointer-events-none');
+          videoControls.style.opacity = '0';
+          videoControls.style.pointerEvents = 'none';
         }, 3000);
       };
       videoSection.onclick = showControls;
@@ -503,8 +508,8 @@ export const RoomUI = {
       
       // Auto-hide after 3 seconds initially
       hideTimeout = setTimeout(() => {
-        videoControls.classList.remove('opacity-100');
-        videoControls.classList.add('opacity-0', 'pointer-events-none');
+        videoControls.style.opacity = '0';
+        videoControls.style.pointerEvents = 'none';
       }, 3000);
     }
 

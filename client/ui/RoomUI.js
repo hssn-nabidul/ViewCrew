@@ -478,7 +478,7 @@ export const RoomUI = {
       };
     }
 
-    // Video Control Listeners
+    // Video Control Listeners - auto-hide after 3 seconds of inactivity
     const videoSection = document.querySelector('#video-stage');
     const videoControls = document.querySelector('#video-controls');
     const videoContainer = document.querySelector('#video-container');
@@ -500,6 +500,12 @@ export const RoomUI = {
         videoContainer.ontouchstart = showControls;
       }
       document.addEventListener('show-video-controls', showControls);
+      
+      // Auto-hide after 3 seconds initially
+      hideTimeout = setTimeout(() => {
+        videoControls.classList.remove('opacity-100');
+        videoControls.classList.add('opacity-0', 'pointer-events-none');
+      }, 3000);
     }
 
     const btnCenterPlay = document.querySelector('#btnCenterPlayPause');

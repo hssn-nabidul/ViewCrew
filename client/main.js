@@ -61,12 +61,15 @@ const render = () => {
     }
     
     lastSource = currentSource;
+    let lastEnteredTheater = currentSource ? roomManager.hasEnteredTheater : false;
     roomManager.onStateChange = (participants) => {
       const newSource = roomManager.syncEngine ? roomManager.syncEngine.currentSource : null;
+      const newEnteredTheater = roomManager.hasEnteredTheater;
       
-      // Only re-render if source actually changed
-      if (newSource !== lastSource) {
+      // Re-render if source OR hasEnteredTheater changed
+      if (newSource !== lastSource || newEnteredTheater !== lastEnteredTheater) {
         lastSource = newSource;
+        lastEnteredTheater = newEnteredTheater;
         render(); 
       }
       // Participant changes are handled by the UI reactively, no full re-render needed

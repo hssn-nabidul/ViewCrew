@@ -82,6 +82,7 @@ export class RoomManager {
 
       // Mark as having entered the room (theater mode)
       this.hasEnteredTheater = true;
+      console.log('[RoomManager] hasEnteredTheater set to true, onStateChange:', !!this.onStateChange);
 
       const isHost = state.hostId === this.userId;
       if (!this.syncEngine) {

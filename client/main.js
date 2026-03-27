@@ -25,7 +25,6 @@ const render = () => {
 
     // Apply any pending source now that the container should exist in the DOM
     if (roomManager.syncEngine && roomManager.syncEngine.tryApplyPendingSource) {
-      console.log('[main.js] Calling tryApplyPendingSource, hasEnteredTheater:', roomManager.hasEnteredTheater);
       roomManager.syncEngine.tryApplyPendingSource();
     }
     

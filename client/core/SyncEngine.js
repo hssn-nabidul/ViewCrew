@@ -243,7 +243,6 @@ export class SyncEngine {
   }
 
   tryApplyPendingSource() {
-    console.log('[SyncEngine] tryApplyPendingSource called, _pendingSource:', this._pendingSource);
     if (!this._pendingSource) return;
     
     // Don't apply if we're already loading the same source

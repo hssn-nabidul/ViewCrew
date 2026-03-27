@@ -561,7 +561,8 @@ export const RoomUI = {
         const rect = seekContainer.getBoundingClientRect();
         const pos = (e.clientX - rect.left) / rect.width;
         const player = roomManager.syncEngine.player;
-        if (player && player.getDuration()) {
+        const dur = player?.getDuration?.();
+        if (player && dur && isFinite(dur) && dur > 0) {
           const newTime = pos * player.getDuration();
           player.seek(newTime);
           roomManager.syncEngine.onPlayerEvent('seek', { time: newTime });

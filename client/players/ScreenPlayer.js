@@ -217,8 +217,17 @@ export class ScreenPlayer extends PlayerInterface {
     container.appendChild(overlay);
   }
 
+  play() { 
+    if (this.video) {
+      this._tryPlay(); 
+    }
+  }
   pause() { if (this.video) this.video.pause(); }
-  seek(time) { if (this.video) this.video.currentTime = time; }
+  seek(time) { 
+    if (this.video && isFinite(time)) {
+      this.video.currentTime = time; 
+    }
+  }
   getCurrentTime() { return this.video ? this.video.currentTime : 0; }
   getDuration() { return this.video ? this.video.duration : 0; }
   isPaused() { return this.video ? this.video.paused : true; }

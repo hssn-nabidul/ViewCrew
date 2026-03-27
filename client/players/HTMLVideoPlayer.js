@@ -17,31 +17,13 @@ export class HTMLVideoPlayer extends PlayerInterface {
     if (!this.video) {
       console.log('[HTMLVideoPlayer] Creating video element');
       this.video = document.createElement('video');
-      
-      // MOBILE FIX: Set attributes BEFORE adding to DOM
-      this.video.controls = false;
-      this.video.playsInline = true;
-      this.video.autoplay = true;
-      this.video.muted = false; // Must be false so the host can hear the local video
-      
-      // iOS Safari specific attributes
-      this.video.setAttribute('playsinline', '');
-      this.video.setAttribute('webkit-playsinline', '');
-      this.video.setAttribute('x5-playsinline', '');
-      this.video.setAttribute('x5-video-player-type', 'h5');
-      this.video.setAttribute('x5-video-player-fullscreen', 'false');
-      this.video.setAttribute('disablePictureInPicture', '');
-      this.video.setAttribute('disableRemotePlayback', '');
-      
       this.video.style.width = '100%';
       this.video.style.height = '100%';
       this.video.style.position = 'relative';
       this.video.style.zIndex = '10';
-      
-      // MOBILE FIX: GPU acceleration for mobile
-      this.video.style.transform = 'translateZ(0)';
-      this.video.style.webkitTransform = 'translateZ(0)';
-      this.video.style.willChange = 'transform';
+      this.video.controls = false;
+      this.video.playsInline = true;
+      this.video.muted = false; // Must be false so the host can hear the local video
       
       this.video.onplay = () => {
         console.log('[HTMLVideoPlayer] Video playing');
@@ -55,10 +37,7 @@ export class HTMLVideoPlayer extends PlayerInterface {
       this.video.onloadeddata = () => {
         console.log('[HTMLVideoPlayer] Video loaded data');
         this.onEvent('ready', null);
-        // Attempt autoplay. If unmuted autoplay is blocked (some desktop browsers
-        // require a direct user gesture), mute and retry. This is critical because
-        // captureStream() only fires after onplay — if play() never succeeds,
-        // the viewer never receives the WebRTC stream and gets a black screen.
+        
         const playPromise = this.video.play();
         if (playPromise !== undefined) {
           playPromise.catch(() => {
@@ -113,7 +92,7 @@ export class HTMLVideoPlayer extends PlayerInterface {
     overlay.id = 'play-overlay-local';
     overlay.className = 'absolute inset-0 z-[100] flex flex-col items-center justify-center bg-black/80 backdrop-blur-md cursor-pointer transition-opacity duration-300';
     overlay.innerHTML = `
-      <div class="w-24 h-24 bg-primary rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(192,193,255,0.4)] hover:scale-110 active:scale-95 transition-all mb-6">
+      <div class="w-24 h-24 bg-primary rounded-full flex items-center justify-center shadow-[0_0_40px_rgba(192,193,255,0.4)] mb-6">
         <span class="material-symbols-outlined text-6xl text-on-primary">play_arrow</span>
       </div>
       <span class="text-white font-black tracking-[0.2em] uppercase text-xl drop-shadow-lg">Tap to Play Local Video</span>
@@ -121,7 +100,8 @@ export class HTMLVideoPlayer extends PlayerInterface {
     
     overlay.onclick = () => {
       if (this.video) {
-        this.video.play();
+        this.video.muted = false; // Ensure unmuted on tap
+        this.video.play().catch(console.error);
       }
       overlay.style.opacity = '0';
       setTimeout(() => overlay.remove(), 300);

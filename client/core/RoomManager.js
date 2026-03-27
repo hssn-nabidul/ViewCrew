@@ -85,6 +85,13 @@ export class RoomManager {
     }
     if (audio.srcObject !== remoteStream) {
       audio.srcObject = remoteStream;
+      // FIX: The `autoplay` attribute alone is blocked by Android Chrome's
+      // autoplay policy. We must call .play() explicitly. If it still fails
+      // (edge cases), we silently swallow the error — the user simply won't
+      // hear that participant, which is better than crashing.
+      audio.play().catch(err => {
+        console.warn(`[RoomManager] Audio autoplay blocked for ${remoteUserId}:`, err);
+      });
     }
   }
 

@@ -37,8 +37,23 @@ export class HTMLVideoPlayer extends PlayerInterface {
       this.video.onloadeddata = () => {
         console.log('[HTMLVideoPlayer] Video loaded data');
         this.onEvent('ready', null);
-        // Attempt autoplay for local files (triggered by user selection)
-        this.play();
+        // Attempt autoplay. If unmuted autoplay is blocked (some desktop browsers
+        // require a direct user gesture), mute and retry. This is critical because
+        // captureStream() only fires after onplay — if play() never succeeds,
+        // the viewer never receives the WebRTC stream and gets a black screen.
+        const playPromise = this.video.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            console.warn('[HTMLVideoPlayer] Unmuted autoplay blocked, retrying muted');
+            this.video.muted = true;
+            this.video.play()
+              .then(() => this.showPlayOverlay()) // show overlay so host can unmute
+              .catch(err => {
+                console.error('[HTMLVideoPlayer] Muted play also failed:', err);
+                this.showPlayOverlay();
+              });
+          });
+        }
       };
       this.video.onwaiting = () => console.log('[HTMLVideoPlayer] Video buffering');
       this.video.onerror = (e) => console.error('[HTMLVideoPlayer] Video error:', e);

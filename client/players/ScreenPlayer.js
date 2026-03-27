@@ -86,16 +86,72 @@ export class ScreenPlayer extends PlayerInterface {
   _tryPlay(retries = 3) {
     if (!this.video) return;
 
-    this.video.play().catch((err) => {
-      console.warn(`[ScreenPlayer] Play attempt failed (${retries} retries left):`, err);
-      if (retries > 0) {
-        // Retry after a short delay — Android sometimes needs the event loop to settle
-        setTimeout(() => this._tryPlay(retries - 1), 500);
-      } else {
-        // All retries exhausted — show tap-to-play overlay for user gesture
-        this.showPlayOverlay();
+    this.video.play()
+      .then(() => {
+        // FIX: Play succeeded, but the video is MUTED. We must give the user
+        // a visible way to unmute it. The old code only showed the overlay when
+        // play() FAILED. When muted autoplay SUCCEEDS, no overlay ever appeared,
+        // so the viewer was permanently stuck with a silent video.
+        // Show a non-blocking unmute button in the corner instead.
+        this._showUnmuteButton();
+      })
+      .catch((err) => {
+        console.warn(`[ScreenPlayer] Play attempt failed (${retries} retries left):`, err);
+        if (retries > 0) {
+          setTimeout(() => this._tryPlay(retries - 1), 500);
+        } else {
+          // All retries exhausted — show full blocking overlay
+          this.showPlayOverlay();
+        }
+      });
+  }
+
+  _showUnmuteButton() {
+    // Don't show if already unmuted or button already exists
+    if (!this.video || !this.video.muted) return;
+    if (document.getElementById('unmute-btn')) return;
+
+    const container = document.getElementById(this.containerId);
+    if (!container) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'unmute-btn';
+    // Inline styles so it works regardless of Tailwind purge
+    btn.style.cssText = [
+      'position:absolute',
+      'bottom:72px',  // above controls bar
+      'left:16px',
+      'z-index:60',
+      'display:flex',
+      'align-items:center',
+      'gap:6px',
+      'background:rgba(0,0,0,0.75)',
+      'color:#fff',
+      'border:1px solid rgba(255,255,255,0.2)',
+      'border-radius:999px',
+      'padding:8px 14px',
+      'font-size:13px',
+      'font-weight:600',
+      'cursor:pointer',
+      'backdrop-filter:blur(8px)',
+      '-webkit-backdrop-filter:blur(8px)',
+    ].join(';');
+
+    btn.innerHTML = `
+      <span class="material-symbols-outlined" style="font-size:16px;line-height:1">volume_off</span>
+      Tap to unmute
+    `;
+
+    btn.onclick = () => {
+      if (this.video) {
+        this.video.muted = false;
+        // Call play() inside the user gesture so Android unlocks audio
+        this.video.play().catch(e => console.warn('[ScreenPlayer] Unmute play failed:', e));
       }
-    });
+      btn.remove();
+    };
+
+    container.appendChild(btn);
   }
 
   _attachStreamListeners(stream) {

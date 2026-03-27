@@ -63,7 +63,12 @@ export class PeerManager {
       console.log(`[PeerManager] Receiving ${type} call from: ${call.peer}`);
 
       if (type === 'audio') {
-        call.answer(this.localStream);
+        // FIX: Never pass null to call.answer(). When mic permission is denied,
+        // this.localStream is null. Passing null to PeerJS causes it to fail the
+        // entire RTCPeerConnection — which then also breaks the screen share call
+        // because the peer is in a broken state. An empty MediaStream is safe:
+        // it tells PeerJS "I accept this call, I just have nothing to send back."
+        call.answer(this.localStream || new MediaStream());
       } else {
         // FIX 2: Pass an empty MediaStream instead of nothing.
         // call.answer() with no args causes PeerJS to skip video codec

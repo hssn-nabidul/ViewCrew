@@ -17,7 +17,7 @@ export class ScreenPlayer extends PlayerInterface {
 
       // --- MOBILE PLAYBACK FLAGS ---
       this.video.autoplay = true;
-      this.video.muted = true;
+      this.video.muted = false; // Don't mute by default - audio comes through
       this.video.controls = false;
       this.video.playsInline = true;
       this.video.setAttribute('playsinline', '');
@@ -62,10 +62,9 @@ export class ScreenPlayer extends PlayerInterface {
   _tryPlay(retries = 5) {
     if (!this.video) return;
 
-    this.video.muted = true;
+    // Don't force mute - let audio play
     this.video.play()
       .then(() => {
-        this._showEasyUnmuteOverlay();
         this._forceRenderingKick();
       })
       .catch((err) => {

@@ -17,6 +17,7 @@ export class SyncEngine {
     this._pendingStream = null;
     this._pendingSource = null;
     this._isLoadingScreen = false;
+    this._sourceLoadedTimeout = null;
 
     this.setupListeners();
   }
@@ -110,9 +111,16 @@ export class SyncEngine {
     const onEvent = (type, data) => this.onPlayerEvent(type, data);
     const onReady = () => {
       console.log('[SyncEngine] Player ready, triggering onSourceLoaded');
-      if (this.onSourceLoaded) {
-        this.onSourceLoaded(source, value);
+      // Debounce onSourceLoaded to prevent rapid re-renders
+      if (this._sourceLoadedTimeout) {
+        clearTimeout(this._sourceLoadedTimeout);
       }
+      this._sourceLoadedTimeout = setTimeout(() => {
+        this._sourceLoadedTimeout = null;
+        if (this.onSourceLoaded) {
+          this.onSourceLoaded(source, value);
+        }
+      }, 100);
     };
 
     const existingBadge = document.querySelector('#live-badge');
@@ -234,6 +242,9 @@ export class SyncEngine {
   tryApplyPendingSource() {
     if (!this._pendingSource) return;
     
+    // Don't apply if we're already loading the same source
+    if (this._isLoadingScreen && this._pendingSource.source === 'screen') return;
+    
     const container = document.getElementById(this.containerId);
     if (!container) {
       console.log('[SyncEngine] Container still not ready for pending source');
@@ -254,9 +265,16 @@ export class SyncEngine {
     
     const onEvent = (type, data) => this.onPlayerEvent(type, data);
     const onReady = () => {
-      if (this.onSourceLoaded) {
-        this.onSourceLoaded(source, value);
+      // Debounce onSourceLoaded to prevent rapid re-renders
+      if (this._sourceLoadedTimeout) {
+        clearTimeout(this._sourceLoadedTimeout);
       }
+      this._sourceLoadedTimeout = setTimeout(() => {
+        this._sourceLoadedTimeout = null;
+        if (this.onSourceLoaded) {
+          this.onSourceLoaded(source, value);
+        }
+      }, 100);
     };
 
     const existingBadge = document.querySelector('#live-badge');

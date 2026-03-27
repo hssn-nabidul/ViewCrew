@@ -20,7 +20,7 @@ export class HTMLVideoPlayer extends PlayerInterface {
       this.video.style.width = '100%';
       this.video.style.height = '100%';
       this.video.style.position = 'relative';
-      this.video.style.zIndex = '10';
+      this.video.style.zIndex = '1';
       this.video.controls = false;
       this.video.playsInline = true;
       this.video.muted = true;
@@ -45,11 +45,9 @@ export class HTMLVideoPlayer extends PlayerInterface {
       this.video.onerror = (e) => console.error('[HTMLVideoPlayer] Video error:', e);
       
       this.video.ontouchstart = (e) => {
-        console.log('[HTMLVideoPlayer] video touchstart');
         document.dispatchEvent(new CustomEvent('show-video-controls'));
       };
       this.video.onclick = (e) => {
-        console.log('[HTMLVideoPlayer] video click');
         document.dispatchEvent(new CustomEvent('show-video-controls'));
       };
       

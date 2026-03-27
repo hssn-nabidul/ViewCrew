@@ -485,7 +485,6 @@ export const RoomUI = {
     if (videoSection && videoControls) {
       let hideTimeout;
       const showControls = () => {
-        console.log('[RoomUI] showControls called');
         videoControls.classList.remove('opacity-0', 'pointer-events-none');
         videoControls.classList.add('opacity-100');
         clearTimeout(hideTimeout);
@@ -496,9 +495,9 @@ export const RoomUI = {
       };
       videoSection.onclick = showControls;
       videoSection.onmousemove = showControls;
-      videoSection.ontouchstart = (e) => { console.log('[RoomUI] touchstart'); showControls(); };
+      videoSection.ontouchstart = showControls;
       if (videoContainer) {
-        videoContainer.ontouchstart = (e) => { console.log('[RoomUI] videoContainer touchstart'); showControls(); };
+        videoContainer.ontouchstart = showControls;
       }
       document.addEventListener('show-video-controls', showControls);
     }

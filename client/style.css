@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-on-surface font-body antialiased overflow-hidden;
+  }
+}
+
+@layer components {
+  .material-symbols-outlined {
+    font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+    vertical-align: middle;
+  }
+
+  .glass-panel {
+    background: rgba(14, 14, 15, 0.6);
+    backdrop-filter: blur(20px);
+  }
+
+  .speaking-glow {
+    box-shadow: 0 0 12px rgba(78, 222, 163, 0.4);
+    @apply border-2 border-tertiary;
+  }
+
+  .cinematic-gradient {
+    background: linear-gradient(135deg, #c0c1ff 0%, #8083ff 100%);
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}

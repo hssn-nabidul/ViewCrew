@@ -134,6 +134,7 @@ router.post('/', async (req: Request, res: Response) => {
       participants: new Map([[hostId, hostParticipant]]),
       createdAt: new Date(),
       isActive: true,
+      isScreenSharing: false,
       destroyTimer: null
     };
     

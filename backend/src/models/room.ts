@@ -15,6 +15,8 @@ export interface Room {
   participants: Map<string, Participant>;
   createdAt: Date;
   isActive: boolean;
+  isScreenSharing: boolean;
+  screenSharingUserId?: string;
   destroyTimer?: NodeJS.Timeout | null;
 }
 

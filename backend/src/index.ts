@@ -2,11 +2,17 @@ import express, { Request, Response } from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import path from 'path';
+import { ExpressPeerServer } from 'peer';
 import roomsRouter from './routes/rooms';
 import { setupSocketHandlers } from './socket/handlers';
 
 const app = express();
 const httpServer = createServer(app);
+
+const peerServer = ExpressPeerServer(httpServer, {
+  path: '/'
+});
 
 // Socket.io server with CORS
 const io = new Server(httpServer, {
@@ -20,6 +26,10 @@ const io = new Server(httpServer, {
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use('/peerjs', peerServer);
+
+// API Routes
+app.use('/api/rooms', roomsRouter);
 
 // Health check endpoint
 app.get('/health', (_req: Request, res: Response) => {
@@ -30,12 +40,17 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// API Routes
-app.use('/api/rooms', roomsRouter);
+// Serve static frontend in production
+const clientPath = path.join(__dirname, '../../client/dist');
+app.use(express.static(clientPath));
 
-// 404 handler
-app.use((_req: Request, res: Response) => {
-  res.status(404).json({ error: 'NOT_FOUND', message: 'Endpoint not found' });
+// Fallback to index.html for SPA routing
+app.get('*', (req: Request, res: Response) => {
+  if (req.path.startsWith('/api')) {
+    res.status(404).json({ error: 'NOT_FOUND', message: 'Endpoint not found' });
+  } else {
+    res.sendFile(path.join(clientPath, 'index.html'));
+  }
 });
 
 // Setup WebSocket handlers
@@ -43,6 +58,7 @@ setupSocketHandlers(io);
 
 // Start server
 const PORT = process.env.PORT || 3000;
+
 
 httpServer.listen(PORT, () => {
   console.log(`

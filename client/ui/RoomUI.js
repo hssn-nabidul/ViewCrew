@@ -610,9 +610,10 @@ export const RoomUI = {
       inputLocal.onchange = (e) => {
         const file = e.target.files[0];
         if (file) {
-          // Auto-enter theater when selecting local file
+          // Auto-enter theater and trigger re-render
           if (!roomManager.hasEnteredTheater) {
             roomManager.hasEnteredTheater = true;
+            if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
           }
           RoomUI.currentTab = 'watch';
           roomManager.syncEngine.changeSource('local', URL.createObjectURL(file), roomManager.roomId);

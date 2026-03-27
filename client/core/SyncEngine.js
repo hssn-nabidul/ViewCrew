@@ -94,19 +94,23 @@ export class SyncEngine {
       }
     }
 
+    // Destroy existing player
     if (this.player) {
       console.log('[SyncEngine] Destroying existing player');
       this.player.destroy();
       this.player = null;
     }
-    this.currentSource = source;
-    this.currentSourceValue = value;
-
+    
+    // If container doesn't exist, buffer the source and reset loading flag
     if (!container) {
       console.warn('[SyncEngine] Container not found, buffering source:', source);
       this._pendingSource = { source, value };
+      this._isLoadingSource = false;
       return;
     }
+    
+    this.currentSource = source;
+    this.currentSourceValue = value;
 
     const onEvent = (type, data) => this.onPlayerEvent(type, data);
     const onReady = () => {
@@ -245,8 +249,9 @@ export class SyncEngine {
   tryApplyPendingSource() {
     if (!this._pendingSource) return;
     
-    // Don't apply if we're already loading the same source
-    if (this._isLoadingScreen && this._pendingSource.source === 'screen') return;
+    // Reset loading flags - we'll create a new player
+    this._isLoadingSource = false;
+    this._isLoadingScreen = false;
     
     const container = document.getElementById(this.containerId);
     if (!container) {

@@ -13,9 +13,19 @@ export class ScreenShare {
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
-          autoGainControl: false
+          autoGainControl: false,
+          googEchoCancellation: false,
+          googNoiseSuppression: false,
+          googAutoGainControl: false
         }
       });
+
+      // Disable any audio processing on the screen share stream
+      const audioTrack = this.stream.getAudioTracks()[0];
+      if (audioTrack) {
+        const settings = audioTrack.getSettings();
+        console.log('[ScreenShare] Audio track settings:', settings);
+      }
 
       this.stream.getVideoTracks()[0].onended = () => {
         this.stop();

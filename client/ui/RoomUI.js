@@ -157,7 +157,7 @@ export const RoomUI = {
             <!-- Top Info Bar -->
             <div class="p-8 flex items-center justify-between pointer-events-auto">
               <div class="space-y-1">
-                <h3 class="text-2xl font-black tracking-tighter text-white">Interstellar</h3>
+                <h3 class="text-2xl font-black tracking-tighter text-white">${currentSourceValue || 'ViewCrew'}</h3>
                 <div class="flex items-center gap-3">
                   <span class="text-[10px] font-black uppercase tracking-widest text-primary bg-primary/10 px-2 py-0.5 rounded">Live Sync</span>
                   <span class="w-1 h-1 rounded-full bg-white/20"></span>
@@ -386,10 +386,10 @@ export const RoomUI = {
 
         <div class="space-y-6">
           <div class="relative">
-            <input id="inputSourceUrl" class="w-full h-18 bg-background border border-white/10 rounded-2xl px-6 text-on-surface placeholder:text-on-surface-variant/20 focus:ring-2 focus:ring-primary/50 transition-all outline-none font-bold text-lg" placeholder="Paste Transmission URL..." type="text"/>
+            <input id="inputSourceUrl" class="w-full h-14 bg-background border border-white/10 rounded-2xl px-6 text-on-surface placeholder:text-on-surface-variant/20 focus:ring-2 focus:ring-primary/50 transition-all outline-none font-bold text-lg" placeholder="Paste Transmission URL..." type="text"/>
             <span class="absolute right-6 top-6 material-symbols-outlined text-on-surface-variant/20">link</span>
           </div>
-          <button id="btnStartWatching" class="w-full h-18 bg-primary text-on-primary font-black rounded-2xl active:scale-[0.97] transition-all flex items-center justify-center gap-4 shadow-2xl shadow-primary/30 uppercase tracking-[0.3em] text-[10px]">
+          <button id="btnStartWatching" class="w-full h-14 bg-primary text-on-primary font-black rounded-2xl active:scale-[0.97] transition-all flex items-center justify-center gap-4 shadow-2xl shadow-primary/30 uppercase tracking-[0.3em] text-[10px]">
             <span>Ignite Transmission</span>
             <span class="material-symbols-outlined text-base" style="font-variation-settings: 'FILL' 1;">play_arrow</span>
           </button>
@@ -678,7 +678,7 @@ export const RoomUI = {
     if (btnSend && inputChat) {
       const send = () => { const m = inputChat.value.trim(); if (m) { roomManager.sendChatMessage(m); inputChat.value = ''; } };
       btnSend.onclick = send;
-      inputChat.onkeypress = (e) => { if (e.key === 'Enter') send(); };
+      inputChat.onkeydown = (e) => { if (e.key === 'Enter') send(); };
     }
 
     // Progress Loop

@@ -151,13 +151,14 @@ export class SyncEngine {
       onReady();
     } else if (source === 'screen') {
       this.player = new ScreenPlayer(this.containerId, onEvent);
-      this._isLoadingScreen = false;
       if (this._pendingStream) {
         console.log('[SyncEngine] Applying buffered pending stream to new ScreenPlayer');
         this.player.load(this._pendingStream);
         this._pendingStream = null;
       }
       onReady();
+      // Reset loading flag after stream is attached
+      this._isLoadingScreen = false;
     }
     
     // Reset loading flag after player creation

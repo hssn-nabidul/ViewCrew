@@ -64,14 +64,12 @@ const render = () => {
     roomManager.onStateChange = (participants) => {
       const newSource = roomManager.syncEngine ? roomManager.syncEngine.currentSource : null;
       
-      // If source changed, we need a full render to show/hide lobby or update controls
+      // Only re-render if source actually changed
       if (newSource !== lastSource) {
         lastSource = newSource;
         render(); 
-      } else {
-        // Full re-render for UI updates (e.g. sidebar tabs, lobby state)
-        render();
       }
+      // Participant changes are handled by the UI reactively, no full re-render needed
     };
     
     roomManager.onChatMessage = (userId, displayName, message, timestamp, isMe) => {

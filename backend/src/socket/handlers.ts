@@ -12,6 +12,13 @@ interface SocketData {
 // Room participants tracking (socketId -> {roomId, userId})
 const socketToRoom = new Map<string, { roomId: string; userId: string }>();
 
+// Rate limiting for chat messages (socketId -> timestamp of last message)
+const chatRateLimit = new Map<string, number>();
+const CHAT_RATE_LIMIT_MS = 1000; // 1 message per second
+const CHAT_RATE_LIMIT_WINDOW = 10; // Max 10 messages
+const chatMessageCount = new Map<string, number>();
+const chatMessageWindow = new Map<string, number>();
+
 export function setupSocketHandlers(io: Server): void {
   io.on('connection', (socket: Socket) => {
     console.log(`[Socket] Client connected: ${socket.id}`);
@@ -159,11 +166,39 @@ export function setupSocketHandlers(io: Server): void {
     socket.on('chat-message', (data: { message: string }) => {
       const roomId = socketData.roomId;
       if (!roomId || !socketData.userId || !socketData.displayName) return;
+      
+      // Rate limiting - check if user is sending too fast
+      const now = Date.now();
+      const lastMessage = chatRateLimit.get(socket.id) || 0;
+      if (now - lastMessage < CHAT_RATE_LIMIT_MS) {
+        socket.emit('error', { code: 'RATE_LIMITED', message: 'Sending messages too fast' });
+        return;
+      }
+      
+      // Track message count in current window
+      const windowStart = chatMessageWindow.get(socket.id) || 0;
+      if (now - windowStart > 60000) {
+        // Reset window after 1 minute
+        chatMessageCount.set(socket.id, 1);
+        chatMessageWindow.set(socket.id, now);
+      } else {
+        const count = (chatMessageCount.get(socket.id) || 0) + 1;
+        chatMessageCount.set(socket.id, count);
+        if (count > CHAT_RATE_LIMIT_WINDOW) {
+          socket.emit('error', { code: 'RATE_LIMITED', message: 'Too many messages, please slow down' });
+          return;
+        }
+      }
+      chatRateLimit.set(socket.id, now);
+      
+      // Validate and sanitize message
+      const message = data.message?.trim().substring(0, 500) || '';
+      if (message.length === 0) return;
 
       io.to(roomId).emit('chat-message', {
         userId: socketData.userId,
         displayName: socketData.displayName,
-        message: data.message.trim().substring(0, 500),
+        message,
         timestamp: new Date().toISOString()
       });
     });
@@ -186,6 +221,10 @@ export function setupSocketHandlers(io: Server): void {
       if (mapping) {
         handleLeaveRoom(io, socket, mapping.roomId, mapping.userId);
       }
+      // Clean up rate limit data
+      chatRateLimit.delete(socket.id);
+      chatMessageCount.delete(socket.id);
+      chatMessageWindow.delete(socket.id);
     });
   });
 }

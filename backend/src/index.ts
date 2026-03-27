@@ -3,6 +3,7 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
+import rateLimit from 'express-rate-limit';
 import { ExpressPeerServer } from 'peer';
 import roomsRouter from './routes/rooms';
 import { setupSocketHandlers } from './socket/handlers';
@@ -33,6 +34,23 @@ app.use(cors({
   credentials: true
 }));
 app.use(express.json());
+
+// Rate limiting for API endpoints
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { error: 'Too many requests, please try again later.' }
+});
+
+// Strict rate limit for room creation/joining
+const roomLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // limit each IP to 10 room operations per minute
+  message: { error: 'Too many room operations, please slow down.' }
+});
+
+app.use('/api/', apiLimiter);
+app.use('/api/rooms', roomLimiter);
 app.use('/peerjs', peerServer);
 
 // API Routes
@@ -79,14 +97,17 @@ httpServer.listen(PORT, () => {
 });
 
 // Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('[Server] SIGTERM received, shutting down...');
+const shutdown = () => {
+  console.log('[Server] Shutting down...');
   io.close(() => {
     httpServer.close(() => {
       console.log('[Server] Server closed');
       process.exit(0);
     });
   });
-});
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 
 export { app, io };

@@ -44,13 +44,6 @@ export class HTMLVideoPlayer extends PlayerInterface {
       this.video.onwaiting = () => console.log('[HTMLVideoPlayer] Video buffering');
       this.video.onerror = (e) => console.error('[HTMLVideoPlayer] Video error:', e);
       
-      this.video.ontouchstart = (e) => {
-        document.dispatchEvent(new CustomEvent('show-video-controls'));
-      };
-      this.video.onclick = (e) => {
-        document.dispatchEvent(new CustomEvent('show-video-controls'));
-      };
-      
       container.innerHTML = '';
       container.appendChild(this.video);
     }

@@ -5,7 +5,7 @@ export const RoomUI = {
   seekAnimationFrame: null,
   chatMessages: [],
 
-  render: (roomId, participants, userId, currentSource, hasEnteredTheater) => {
+  render: (roomId, participants, userId, currentSource, currentSourceValue, hasEnteredTheater) => {
     if (!hasEnteredTheater) {
       return RoomUI.renderLobbyView(participants, userId, roomId);
     }
@@ -42,7 +42,7 @@ export const RoomUI = {
         <main class="flex-1 flex overflow-hidden">
           <!-- Main Cinema Stage -->
           <div class="flex-1 flex flex-col relative bg-black overflow-hidden">
-            ${activeView === 'source' ? RoomUI.renderSourceView() : RoomUI.renderWatchView(currentSource, participants, userId, isHost)}
+            ${activeView === 'source' ? RoomUI.renderSourceView() : RoomUI.renderWatchView(currentSource, currentSourceValue, participants, userId, isHost)}
           </div>
 
           <!-- Desktop Sidebar (Chat & People) -->
@@ -81,7 +81,7 @@ export const RoomUI = {
   renderView: (view, roomId, participants, userId, currentSource, isHost) => {
     switch (view) {
       case 'lobby': return RoomUI.renderLobbyView(participants, userId, roomId);
-      case 'watch': return RoomUI.renderWatchView(currentSource, participants, userId, isHost);
+      case 'watch': return RoomUI.renderWatchView(currentSource, currentSourceValue, participants, userId, isHost);
       case 'chat': return RoomUI.renderChatView(participants, userId);
       case 'people': return RoomUI.renderPeopleView(participants, userId);
       case 'settings': return RoomUI.renderSettingsView(participants, userId);
@@ -142,7 +142,7 @@ export const RoomUI = {
     `;
   },
 
-  renderWatchView: (currentSource, participants, userId, isHost) => {
+  renderWatchView: (currentSource, currentSourceValue, participants, userId, isHost) => {
     return `
       <div class="flex flex-col h-full bg-black relative group">
         <!-- Netflix-style Video Stage -->

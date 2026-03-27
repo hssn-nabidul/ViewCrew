@@ -65,7 +65,9 @@ export class RoomManager {
     this.screenShare.stop();
     this.peerManager.stopScreenShare();
 
-    this.syncEngine.changeSource(null, null, this.roomId);
+    if (this.syncEngine) {
+      this.syncEngine.changeSource(null, null, this.roomId);
+    }
   }
 
   setupListeners() {
@@ -119,6 +121,9 @@ export class RoomManager {
     this.socket.on('user-left', (leftUserId) => {
       console.log(`[RoomManager] User left: ${leftUserId}`);
       this.participants = this.participants.filter(p => p.userId !== leftUserId);
+      
+      // Clean up peer connection
+      this.peerManager.removeCallReference(leftUserId, 'screen');
 
       if (this.onStateChange) this.onStateChange(this.participants);
     });

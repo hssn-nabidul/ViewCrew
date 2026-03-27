@@ -85,6 +85,9 @@ export function setupSocketHandlers(io: Server): void {
         await handleLeaveRoom(io, socket, roomId.toUpperCase(), userId);
       } catch (error) {
         console.error('[Socket] Error leaving room:', error);
+        // Ensure socketToRoom is cleaned up even on error
+        socketToRoom.delete(socket.id);
+        socket.emit('error', { code: 'LEAVE_FAILED', message: 'Failed to leave room' });
       }
     });
 

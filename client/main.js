@@ -15,6 +15,21 @@ const roomId = new URLSearchParams(window.location.search).get('room');
 
 const roomManager = new RoomManager(API_URL, userId, displayName);
 
+// Track cleanup for event listeners
+let cleanupRender = null;
+let lastSource = null;
+
+const cleanup = () => {
+  if (cleanupRender) {
+    cleanupRender();
+    cleanupRender = null;
+  }
+  if (roomManager.syncEngine) {
+    roomManager.syncEngine.cleanup();
+  }
+  roomManager.destroy();
+};
+
 const render = () => {
   if (roomId) {
     const currentSource = roomManager.syncEngine ? roomManager.syncEngine.currentSource : null;
@@ -28,7 +43,12 @@ const render = () => {
     const lobbyView = document.querySelector('[data-lobby]');
     console.log('[render] Container exists:', !!container, 'Lobby exists:', !!lobbyView);
     console.log('[render] Active view:', RoomUI.currentTab);
-    RoomUI.initListeners(roomManager);
+    
+    // Cleanup previous render listeners before setting new ones
+    if (cleanupRender) {
+      cleanupRender();
+    }
+    cleanupRender = RoomUI.initListeners(roomManager);
 
     // Apply any pending source now that the container should exist in the DOM
     if (roomManager.syncEngine && roomManager.syncEngine.tryApplyPendingSource) {
@@ -40,7 +60,7 @@ const render = () => {
       roomManager.syncEngine.loadSource(currentSource, currentSourceValue);
     }
     
-    let lastSource = currentSource;
+    lastSource = currentSource;
     roomManager.onStateChange = (participants) => {
       const newSource = roomManager.syncEngine ? roomManager.syncEngine.currentSource : null;
       
@@ -63,6 +83,12 @@ const render = () => {
     }
   } else {
     app.innerHTML = LandingUI.render(displayName);
+    
+    if (cleanupRender) {
+      cleanupRender();
+      cleanupRender = null;
+    }
+    
     LandingUI.initListeners({
       onCreateRoom: async (name) => {
         const finalName = name || `User_${userId}`;
@@ -70,7 +96,6 @@ const render = () => {
         try {
           const data = await roomManager.createRoom(finalName);
           if (data.roomId && data.participantId) {
-            // Store the backend-provided host ID
             userId = data.participantId;
             localStorage.setItem('watchsync-userId', userId);
             window.location.href = `?room=${data.roomId}`;
@@ -85,7 +110,6 @@ const render = () => {
           storage.setDisplayName(finalName);
           
           try {
-            // Join via API first to get a valid participantId
             const res = await fetch(`${API_URL}/api/rooms/${room}/join`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -110,5 +134,9 @@ const render = () => {
     });
   }
 };
+
+// Cleanup on page unload
+window.addEventListener('beforeunload', cleanup);
+window.addEventListener('pagehide', cleanup);
 
 render();

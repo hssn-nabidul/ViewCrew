@@ -15,16 +15,23 @@ const peerServer = ExpressPeerServer(httpServer, {
 });
 
 // Socket.io server with CORS
+const corsOrigins = process.env.CORS_ORIGINS 
+  ? process.env.CORS_ORIGINS.split(',') 
+  : ['http://localhost:5173', 'https://view-crew.vercel.app'];
+  
 const io = new Server(httpServer, {
   cors: {
-    origin: '*', // In production, restrict this to your frontend domain
+    origin: corsOrigins,
     methods: ['GET', 'POST'],
     credentials: true
   }
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: corsOrigins,
+  credentials: true
+}));
 app.use(express.json());
 app.use('/peerjs', peerServer);
 

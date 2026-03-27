@@ -718,6 +718,12 @@ export const RoomUI = {
     } else if (!roomManager.syncEngine) {
       // syncEngine not created yet, will attach on next render
     }
+    
+    // Return cleanup function to remove listeners
+    return () => {
+      cancelAnimationFrame(RoomUI.seekAnimationFrame);
+      document.removeEventListener('show-video-controls', RoomUI._showControlsHandler);
+    };
   },
 
   updateParticipants: (participants, userId) => {

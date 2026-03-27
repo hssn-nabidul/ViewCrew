@@ -20,7 +20,7 @@ const render = () => {
     const currentSource = roomManager.syncEngine ? roomManager.syncEngine.currentSource : null;
     const currentSourceValue = roomManager.syncEngine ? roomManager.syncEngine.currentSourceValue : null;
     
-    app.innerHTML = RoomUI.render(roomId, roomManager.participants, userId, currentSource);
+    app.innerHTML = RoomUI.render(roomId, roomManager.participants, userId, currentSource, roomManager.hasEnteredTheater);
     RoomUI.initListeners(roomManager);
 
     // Re-attach player if it already existed (handles full re-renders)
@@ -37,7 +37,8 @@ const render = () => {
         lastSource = newSource;
         render(); 
       } else {
-        RoomUI.updateParticipants(participants, userId);
+        // Full re-render for UI updates (e.g. sidebar tabs, lobby state)
+        render();
       }
     };
     

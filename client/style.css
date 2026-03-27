@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-background text-on-surface font-body antialiased overflow-hidden;
+    @apply bg-background text-on-surface font-body antialiased selection:bg-primary/30 overflow-hidden;
   }
 }
 
@@ -14,18 +14,13 @@
     vertical-align: middle;
   }
 
-  .glass-panel {
-    background: rgba(14, 14, 15, 0.6);
-    backdrop-filter: blur(20px);
+  .glass {
+    @apply bg-surface/60 backdrop-blur-xl border border-white/5;
   }
 
   .speaking-glow {
-    box-shadow: 0 0 12px rgba(78, 222, 163, 0.4);
-    @apply border-2 border-tertiary;
-  }
-
-  .cinematic-gradient {
-    background: linear-gradient(135deg, #c0c1ff 0%, #8083ff 100%);
+    box-shadow: 0 0 15px rgba(229, 9, 20, 0.2);
+    @apply border-2 border-primary;
   }
 
   .no-scrollbar::-webkit-scrollbar {
@@ -35,4 +30,42 @@
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
   }
+}
+
+/* Cinematic Transitions */
+.view-enter {
+  opacity: 0;
+  transform: scale(0.98);
+}
+.view-enter-active {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 300ms ease-out, transform 300ms ease-out;
+}
+
+/* Custom Seekbar Styling */
+input[type=range].accent-primary::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 14px;
+  width: 14px;
+  border-radius: 50%;
+  @apply bg-primary;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(229, 9, 20, 0.4);
+}
+
+/* Standardized Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
 }

@@ -41,7 +41,7 @@ export const RoomUI = {
         <main class="flex-1 flex overflow-hidden">
           <!-- Main Cinema Stage -->
           <div class="flex-1 flex flex-col relative bg-black overflow-hidden">
-            ${RoomUI.renderWatchView(currentSource, participants, userId, isHost)}
+            ${activeView === 'source' ? RoomUI.renderSourceView() : RoomUI.renderWatchView(currentSource, participants, userId, isHost)}
           </div>
 
           <!-- Desktop Sidebar (Chat & People) -->
@@ -451,18 +451,6 @@ export const RoomUI = {
     });
 
     // Top Bar Actions
-    const btnBack = document.querySelector('#btnBackToLobby');
-    if (btnBack) {
-      btnBack.onclick = () => {
-        if (RoomUI.currentTab !== 'watch' && roomManager.syncEngine?.currentSource) {
-          RoomUI.currentTab = 'watch';
-        } else {
-          window.location.href = '/';
-        }
-        if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
-      };
-    }
-
     const btnExit = document.querySelector('#btnExitWatch');
     if (btnExit) {
       btnExit.onclick = () => {
@@ -695,10 +683,10 @@ export const RoomUI = {
   },
 
   showReaction: (data) => {
-    const container = document.querySelector('#reactions-container');
+    const container = document.querySelector('#video-container');
     if (!container) return;
     const r = document.createElement('div');
-    r.className = 'bg-white/10 backdrop-blur-md rounded-full p-2 text-xl animate-bounce';
+    r.className = 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-6xl animate-bounce pointer-events-none z-50';
     r.textContent = data.emojiId;
     container.appendChild(r);
     setTimeout(() => r.remove(), 2000);

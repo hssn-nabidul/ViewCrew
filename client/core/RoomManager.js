@@ -101,15 +101,7 @@ export class RoomManager {
     this.screenShare.stop();
     this.peerManager.stopScreenShare();
 
-    const btnShareScreen = document.querySelector('#btnShareScreen');
-    if (btnShareScreen) {
-      btnShareScreen.classList.remove('bg-accent-purple/20', 'text-accent-purple');
-    }
-
     this.syncEngine.changeSource(null, null, this.roomId);
-
-    const placeholder = document.querySelector('#video-placeholder');
-    if (placeholder) placeholder.style.display = 'flex';
   }
 
   setupListeners() {

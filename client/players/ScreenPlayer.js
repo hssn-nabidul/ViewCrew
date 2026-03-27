@@ -5,6 +5,7 @@ export class ScreenPlayer extends PlayerInterface {
     super(containerId, onEvent);
     this.video = null;
     this._currentStream = null;
+    this._watchdog = null;
   }
 
   load(stream) {
@@ -16,7 +17,7 @@ export class ScreenPlayer extends PlayerInterface {
 
       // --- MOBILE PLAYBACK FLAGS ---
       this.video.autoplay = true;
-      this.video.muted = true;       // Always start muted for autoplay success
+      this.video.muted = true;
       this.video.controls = false;
       this.video.playsInline = true;
       this.video.setAttribute('playsinline', '');
@@ -45,19 +46,12 @@ export class ScreenPlayer extends PlayerInterface {
       this._currentStream = stream;
       this._attachStreamListeners(stream);
 
-      // FIX: Force reset srcObject to clear any stuck buffers in Android Chrome
+      // FIX: Force reset srcObject
       this.video.srcObject = null;
       this.video.srcObject = stream;
 
-      // Try to play immediately
       this._tryPlay();
-
-      // Backup trigger for mobile
-      const onData = () => {
-        this.video.removeEventListener('loadeddata', onData);
-        if (this.video && this.video.paused) this._tryPlay();
-      };
-      this.video.addEventListener('loadeddata', onData);
+      this._startRenderingWatchdog();
     } else if (stream && stream === this._currentStream) {
       if (this.video.paused) this._tryPlay();
     }
@@ -68,24 +62,11 @@ export class ScreenPlayer extends PlayerInterface {
   _tryPlay(retries = 5) {
     if (!this.video) return;
 
-    // Ensure we are muted for the autoplay attempt
     this.video.muted = true;
-
     this.video.play()
       .then(() => {
-        console.log('[ScreenPlayer] Play successful (muted)');
-        // FIX: Instead of a tiny button, show a large, easy-to-click overlay
-        // if the video is still muted (which it will be).
         this._showEasyUnmuteOverlay();
-        
-        // ANDROID RENDERING KICK: Toggle a property to force GPU repaint
-        // This often fixes the "black screen while playing" bug on Android Chrome
-        setTimeout(() => {
-          if (this.video) {
-            this.video.style.opacity = '0.99';
-            setTimeout(() => { if (this.video) this.video.style.opacity = '1'; }, 50);
-          }
-        }, 200);
+        this._forceRenderingKick();
       })
       .catch((err) => {
         console.warn(`[ScreenPlayer] Play failed (${retries} left):`, err);
@@ -97,6 +78,61 @@ export class ScreenPlayer extends PlayerInterface {
       });
   }
 
+  // FIX: Specialized Android "Kick" to force the hardware decoder to render
+  _forceRenderingKick() {
+    if (!this.video) return;
+    
+    // Trick 1: Opacity toggle
+    this.video.style.opacity = '0.99';
+    
+    // Trick 2: Dimension toggle (1px difference forces a full re-layout and repaint)
+    const originalWidth = this.video.style.width;
+    this.video.style.width = 'calc(100% - 1px)';
+    
+    setTimeout(() => {
+      if (this.video) {
+        this.video.style.opacity = '1';
+        this.video.style.width = originalWidth;
+      }
+    }, 100);
+  }
+
+  // FIX: Watchdog to detect black screen (playing but no dimensions or events)
+  _startRenderingWatchdog() {
+    if (this._watchdog) clearInterval(this._watchdog);
+    
+    let checks = 0;
+    this._watchdog = setInterval(() => {
+      if (!this.video || !this._currentStream) {
+        clearInterval(this._watchdog);
+        return;
+      }
+
+      // If video is playing but dimensions are 0, it's likely a black screen
+      if (!this.video.paused && this.video.videoWidth === 0) {
+        console.warn('[ScreenPlayer] Watchdog detected black screen, kicking renderer...');
+        this._forceRenderingKick();
+        
+        // After 10 failed checks, try re-assigning srcObject
+        if (checks > 10) {
+          console.error('[ScreenPlayer] Persistent black screen, re-assigning stream');
+          const s = this.video.srcObject;
+          this.video.srcObject = null;
+          this.video.srcObject = s;
+          this._tryPlay();
+          checks = 0;
+        }
+      } else if (!this.video.paused && this.video.videoWidth > 0) {
+        // Success! Stop watchdog
+        console.log('[ScreenPlayer] Watchdog confirmed rendering!');
+        clearInterval(this._watchdog);
+      }
+      
+      checks++;
+      if (checks > 30) clearInterval(this._watchdog); // Stop after 30s
+    }, 1000);
+  }
+
   _showEasyUnmuteOverlay() {
     if (!this.video || !this.video.muted) return;
     if (document.getElementById('unmute-overlay')) return;
@@ -106,25 +142,35 @@ export class ScreenPlayer extends PlayerInterface {
 
     const overlay = document.createElement('div');
     overlay.id = 'unmute-overlay';
-    overlay.className = 'absolute inset-0 z-[70] flex flex-col items-center justify-center bg-black/40 backdrop-blur-[2px] cursor-pointer transition-opacity duration-300';
+    // Use high z-index and fixed positioning to ensure it's clickable above all else
+    overlay.style.cssText = `
+      position: absolute;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0,0,0,0.2);
+      backdrop-filter: blur(1px);
+      cursor: pointer;
+    `;
+
     overlay.innerHTML = `
-      <div class="flex flex-col items-center animate-bounce">
-        <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center border-2 border-white/40 mb-4">
-          <span class="material-symbols-outlined text-white text-5xl">volume_off</span>
-        </div>
-        <span class="text-white font-bold tracking-widest uppercase text-sm drop-shadow-md">Tap Anywhere to Unmute</span>
+      <div style="background:rgba(0,0,0,0.6); padding: 20px; border-radius: 20px; text-align:center;">
+        <span class="material-symbols-outlined" style="color:white; font-size: 64px; margin-bottom: 10px;">volume_off</span>
+        <div style="color:white; font-weight: bold; letter-spacing: 2px; font-size: 14px;">TAP TO UNMUTE</div>
       </div>
     `;
 
     overlay.onclick = (e) => {
+      e.preventDefault();
       e.stopPropagation();
       if (this.video) {
         this.video.muted = false;
-        // Re-play inside user gesture to ensure audio context unlocks
         this.video.play().catch(console.error);
       }
-      overlay.style.opacity = '0';
-      setTimeout(() => overlay.remove(), 300);
+      overlay.remove();
     };
 
     container.appendChild(overlay);
@@ -136,7 +182,6 @@ export class ScreenPlayer extends PlayerInterface {
       setTimeout(() => this._tryPlay(), 200);
     };
     
-    // Check for "live" status on tracks
     const videoTracks = stream.getVideoTracks();
     videoTracks.forEach(track => {
       track.onunmute = () => {
@@ -172,7 +217,6 @@ export class ScreenPlayer extends PlayerInterface {
     container.appendChild(overlay);
   }
 
-  play() { if (this.video) this._tryPlay(); }
   pause() { if (this.video) this.video.pause(); }
   seek(time) { if (this.video) this.video.currentTime = time; }
   getCurrentTime() { return this.video ? this.video.currentTime : 0; }
@@ -180,6 +224,7 @@ export class ScreenPlayer extends PlayerInterface {
   isPaused() { return this.video ? this.video.paused : true; }
   setVolume(volume) { if (this.video) this.video.volume = volume; }
   destroy() {
+    if (this._watchdog) clearInterval(this._watchdog);
     if (this.video) {
       this.video.pause();
       this.video.srcObject = null;

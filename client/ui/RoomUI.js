@@ -505,12 +505,24 @@ export const RoomUI = {
     if (btnCenterPlay) {
       btnCenterPlay.onclick = (e) => {
         e.stopPropagation();
+        console.log('[RoomUI] Play button clicked');
+        if (!roomManager.syncEngine) {
+          console.warn('[RoomUI] syncEngine not ready');
+          return;
+        }
         const isHost = roomManager.participants.find(p => p.userId === roomManager.userId || p.id === roomManager.userId)?.isHost;
+        console.log('[RoomUI] isHost:', isHost);
         if (!isHost) return;
         const player = roomManager.syncEngine.player;
-        if (player) {
-          if (player.isPaused()) player.play();
-          else player.pause();
+        console.log('[RoomUI] player:', player ? 'exists' : 'null');
+        if (player && player.play && player.pause) {
+          if (player.isPaused()) {
+            console.log('[RoomUI] Calling player.play()');
+            player.play();
+          } else {
+            console.log('[RoomUI] Calling player.pause()');
+            player.pause();
+          }
         }
       };
     }
@@ -654,7 +666,7 @@ export const RoomUI = {
     };
     updateProgress();
 
-    // Player Sync
+    // Player Sync - attach listener if syncEngine exists, otherwise it will be attached on next render
     if (roomManager.syncEngine && !roomManager.syncEngine._uiListenerAttached) {
       roomManager.syncEngine._uiListenerAttached = true;
       const original = roomManager.syncEngine.onPlayerEvent.bind(roomManager.syncEngine);
@@ -663,6 +675,8 @@ export const RoomUI = {
         const icon = document.querySelector('#centerPlayIcon');
         if (icon) icon.textContent = type === 'play' ? 'pause' : 'play_arrow';
       };
+    } else if (!roomManager.syncEngine) {
+      // syncEngine not created yet, will attach on next render
     }
   },
 

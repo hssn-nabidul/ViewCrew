@@ -14,7 +14,7 @@ export class SyncEngine {
     this.DRIFT_THRESHOLD = 3;
     this.SYNC_INTERVAL = 5000;
     this.onSourceLoaded = null;
-    this._pendingStream = null; // FIX: buffer stream if it arrives before player is ready
+    this._pendingStream = null;
 
     this.setupListeners();
   }
@@ -67,6 +67,14 @@ export class SyncEngine {
           if (container && !container.contains(this.player.video)) {
             container.innerHTML = '';
             container.appendChild(this.player.video);
+            
+            // FIX: Re-assign srcObject after re-attaching to DOM to force browser
+            // to reconnect the video pipeline, avoiding potential black screen.
+            const stream = this.player.video.srcObject;
+            if (stream) {
+              this.player.video.srcObject = null;
+              this.player.video.srcObject = stream;
+            }
             this.player.play();
           }
         }
@@ -77,6 +85,12 @@ export class SyncEngine {
           if (container && !container.contains(this.player.video)) {
             container.innerHTML = '';
             container.appendChild(this.player.video);
+            
+            const stream = this.player.video.srcObject;
+            if (stream) {
+              this.player.video.srcObject = null;
+              this.player.video.srcObject = stream;
+            }
             this.player.play();
           }
         } else if (source === 'youtube' && this.player) {
@@ -128,7 +142,6 @@ export class SyncEngine {
       this.player.load(value);
     } else if (source === 'screen') {
       this.player = new ScreenPlayer(this.containerId, onEvent);
-      // FIX: If a stream was buffered while the player wasn't ready yet, apply it now
       if (this._pendingStream) {
         console.log('[SyncEngine] Applying buffered pending stream to new ScreenPlayer');
         this.player.load(this._pendingStream);
@@ -176,28 +189,20 @@ export class SyncEngine {
     console.log('[SyncEngine] Attaching screen stream');
 
     if (this.currentSource !== 'screen') {
-      // Player doesn't exist yet — buffer the stream and let loadSource apply it
       this._pendingStream = stream;
       this.loadSource('screen', null);
       return;
     }
 
     if (this.player && this.player.load) {
-      // FIX: Always load the new stream even if currentSource is already 'screen'.
-      // This handles reconnection scenarios (e.g. host's refreshLocalStream) where
-      // a new stream replaces the old one. ScreenPlayer.load() is now smart enough
-      // to detect same-stream vs new-stream internally.
       this.player.load(stream);
 
-      // FIX: Viewers must explicitly call play() — onPlayerEvent is gated to host only.
-      // Add a short delay so Android Chrome's media pipeline can settle after srcObject change.
       if (!this.isHost) {
         setTimeout(() => {
           if (this.player) this.player.play();
-        }, 300);
+        }, 500);
       }
     } else {
-      // Player not ready yet, buffer the stream
       console.warn('[SyncEngine] ScreenPlayer not ready, buffering stream');
       this._pendingStream = stream;
     }

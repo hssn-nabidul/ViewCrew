@@ -4,7 +4,7 @@ export class ScreenPlayer extends PlayerInterface {
   constructor(containerId, onEvent) {
     super(containerId, onEvent);
     this.video = null;
-    this._currentStream = null; // Track current stream to detect replacements
+    this._currentStream = null;
   }
 
   load(stream) {
@@ -21,22 +21,19 @@ export class ScreenPlayer extends PlayerInterface {
       this.video.style.display = 'block';
       this.video.style.backgroundColor = '#000';
 
-      // --- ANDROID GPU RENDERING FIX ---
-      // Android Chrome receives the WebRTC stream and plays it, but renders
-      // pure black unless the element is promoted to its own GPU compositor layer.
-      // translateZ(0) forces that promotion. Without this the video "plays" but
-      // every frame is discarded before it reaches the screen.
+      // --- GPU RENDERING FIX ---
+      // Force hardware acceleration and prevent frame discarding.
       this.video.style.transform = 'translateZ(0)';
       this.video.style.webkitTransform = 'translateZ(0)';
       this.video.style.willChange = 'transform';
 
-      // --- MOBILE PLAYBACK FLAGS ---
+      // --- PLAYBACK FLAGS ---
       this.video.autoplay = true;
-      this.video.muted = true;       // Must be muted for Android autoplay policy
+      this.video.muted = true;
       this.video.controls = false;
       this.video.playsInline = true;
-      this.video.setAttribute('playsinline', '');         // Belt
-      this.video.setAttribute('webkit-playsinline', '');  // And suspenders
+      this.video.setAttribute('playsinline', '');
+      this.video.setAttribute('webkit-playsinline', '');
 
       container.innerHTML = '';
       container.appendChild(this.video);
@@ -48,25 +45,21 @@ export class ScreenPlayer extends PlayerInterface {
 
     if (stream && stream !== this._currentStream) {
       this._currentStream = stream;
-
-      // FIX: Listen for stream tracks ending (host stopped sharing)
       this._attachStreamListeners(stream);
 
-      // FIX: On Android Chrome, assigning srcObject alone doesn't trigger playback.
-      // We must wait for the video element to actually receive media data before
-      // calling play(). Using 'loadedmetadata' ensures at least one frame is
-      // available, which is required by Android's autoplay policy.
+      // FIX: Resetting srcObject can help browsers recover if the previous assignment
+      // failed or got stuck in a black frame state.
+      this.video.srcObject = null;
       this.video.srcObject = stream;
 
-      // Use a one-shot loadedmetadata listener that triggers play()
       const onMetadata = () => {
         this.video.removeEventListener('loadedmetadata', onMetadata);
+        console.log('[ScreenPlayer] Metadata loaded, triggering play');
         this._tryPlay();
       };
       this.video.addEventListener('loadedmetadata', onMetadata);
 
-      // Fallback: if loadedmetadata doesn't fire within 2s (can happen if the
-      // stream already has frames buffered), try play() anyway.
+      // Fallback for streams that are already "active" or have delayed tracks
       setTimeout(() => {
         this.video.removeEventListener('loadedmetadata', onMetadata);
         if (this.video && this.video.paused) {
@@ -74,7 +67,6 @@ export class ScreenPlayer extends PlayerInterface {
         }
       }, 2000);
     } else if (stream && stream === this._currentStream) {
-      // Same stream re-attached — just ensure it's playing
       if (this.video.paused) {
         this._tryPlay();
       }
@@ -86,13 +78,15 @@ export class ScreenPlayer extends PlayerInterface {
   _tryPlay(retries = 3) {
     if (!this.video) return;
 
+    // FIX: Ensure there's a video track before trying to play,
+    // otherwise some browsers might fail the promise immediately.
+    if (this.video.srcObject && this.video.srcObject.getVideoTracks().length === 0) {
+      console.warn('[ScreenPlayer] No video tracks yet, waiting...');
+      return;
+    }
+
     this.video.play()
       .then(() => {
-        // FIX: Play succeeded, but the video is MUTED. We must give the user
-        // a visible way to unmute it. The old code only showed the overlay when
-        // play() FAILED. When muted autoplay SUCCEEDS, no overlay ever appeared,
-        // so the viewer was permanently stuck with a silent video.
-        // Show a non-blocking unmute button in the corner instead.
         this._showUnmuteButton();
       })
       .catch((err) => {
@@ -100,14 +94,12 @@ export class ScreenPlayer extends PlayerInterface {
         if (retries > 0) {
           setTimeout(() => this._tryPlay(retries - 1), 500);
         } else {
-          // All retries exhausted — show full blocking overlay
           this.showPlayOverlay();
         }
       });
   }
 
   _showUnmuteButton() {
-    // Don't show if already unmuted or button already exists
     if (!this.video || !this.video.muted) return;
     if (document.getElementById('unmute-btn')) return;
 
@@ -116,10 +108,9 @@ export class ScreenPlayer extends PlayerInterface {
 
     const btn = document.createElement('button');
     btn.id = 'unmute-btn';
-    // Inline styles so it works regardless of Tailwind purge
     btn.style.cssText = [
       'position:absolute',
-      'bottom:72px',  // above controls bar
+      'bottom:72px',
       'left:16px',
       'z-index:60',
       'display:flex',
@@ -142,11 +133,11 @@ export class ScreenPlayer extends PlayerInterface {
       Tap to unmute
     `;
 
-    btn.onclick = () => {
+    btn.onclick = (e) => {
+      e.stopPropagation();
       if (this.video) {
         this.video.muted = false;
-        // Call play() inside the user gesture so Android unlocks audio
-        this.video.play().catch(e => console.warn('[ScreenPlayer] Unmute play failed:', e));
+        this.video.play().catch(() => {});
       }
       btn.remove();
     };
@@ -155,37 +146,37 @@ export class ScreenPlayer extends PlayerInterface {
   }
 
   _attachStreamListeners(stream) {
-    // Listen for all video tracks ending (host stopped sharing)
-    const videoTracks = stream.getVideoTracks();
-    videoTracks.forEach(track => {
-      track.onended = () => {
-        console.log('[ScreenPlayer] Remote video track ended');
-        // Stream died — show black with a message or keep last frame
-      };
-    });
-
-    // Listen for tracks being removed from the stream
     stream.onremovetrack = (event) => {
-      console.log('[ScreenPlayer] Track removed from stream:', event.track.kind);
-      if (stream.getVideoTracks().length === 0) {
-        console.log('[ScreenPlayer] All video tracks removed from stream');
-      }
+      console.log('[ScreenPlayer] Track removed:', event.track.kind);
     };
 
-    // Listen for new tracks being added (reconnection scenario)
     stream.onaddtrack = (event) => {
-      console.log('[ScreenPlayer] Track added to stream:', event.track.kind);
-      if (event.track.kind === 'video' && this.video) {
-        // New video track added — force a play
-        this._tryPlay();
+      console.log('[ScreenPlayer] Track added:', event.track.kind);
+      if (event.track.kind === 'video') {
+        // If a video track arrived late, we must trigger play()
+        setTimeout(() => this._tryPlay(), 200);
       }
     };
   }
 
-  play() {
+  play() { if (this.video) this._tryPlay(); }
+  pause() { if (this.video) this.video.pause(); }
+  seek(time) { if (this.video) this.video.currentTime = time; }
+  getCurrentTime() { return this.video ? this.video.currentTime : 0; }
+  getDuration() { return this.video ? this.video.duration : 0; }
+  isPaused() { return this.video ? this.video.paused : true; }
+  setVolume(volume) { if (this.video) this.video.volume = volume; }
+  
+  destroy() {
     if (this.video) {
-      this._tryPlay();
+      this.video.pause();
+      this.video.srcObject = null;
+      this.video.remove();
+      this.video = null;
     }
+    this._currentStream = null;
+    const btn = document.getElementById('unmute-btn');
+    if (btn) btn.remove();
   }
 
   showPlayOverlay() {
@@ -205,29 +196,13 @@ export class ScreenPlayer extends PlayerInterface {
 
     overlay.onclick = () => {
       if (this.video) {
-        this.video.muted = false; // Unmute on user gesture to unlock audio
-        this.video.play().catch(e => console.warn('[ScreenPlayer] Play on tap failed:', e));
+        this.video.muted = false;
+        this.video.play().catch(() => {});
       }
       overlay.style.opacity = '0';
       setTimeout(() => overlay.remove(), 300);
     };
 
     container.appendChild(overlay);
-  }
-
-  pause() { if (this.video) this.video.pause(); }
-  seek(time) { if (this.video) this.video.currentTime = time; }
-  getCurrentTime() { return this.video ? this.video.currentTime : 0; }
-  getDuration() { return this.video ? this.video.duration : 0; }
-  isPaused() { return this.video ? this.video.paused : true; }
-  setVolume(volume) { if (this.video) this.video.volume = volume; }
-  destroy() {
-    if (this.video) {
-      this.video.pause();
-      this.video.srcObject = null;
-      this.video.remove();
-      this.video = null;
-    }
-    this._currentStream = null;
   }
 }

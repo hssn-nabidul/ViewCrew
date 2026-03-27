@@ -4,7 +4,6 @@ const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
   { urls: 'stun:stun2.l.google.com:19302' },
-  // Free TURN fallback — handles mobile CGNAT where STUN alone fails
   {
     urls: 'turn:openrelay.metered.ca:80',
     username: 'openrelayproject',
@@ -31,9 +30,6 @@ export class PeerManager {
       host: url.hostname,
       port: url.port || (url.protocol === 'https:' ? 443 : 80),
       path: '/peerjs',
-      // FIX 1: Explicit ICE config — PeerJS default STUN is unreliable on
-      // mobile networks (carrier-grade NAT). Without TURN, video streams
-      // silently fail on ~30% of mobile connections.
       config: {
         iceServers: ICE_SERVERS,
         iceTransportPolicy: 'all'
@@ -63,19 +59,11 @@ export class PeerManager {
       console.log(`[PeerManager] Receiving ${type} call from: ${call.peer}`);
 
       if (type === 'audio') {
-        // FIX: Never pass null to call.answer(). When mic permission is denied,
-        // this.localStream is null. Passing null to PeerJS causes it to fail the
-        // entire RTCPeerConnection — which then also breaks the screen share call
-        // because the peer is in a broken state. An empty MediaStream is safe:
-        // it tells PeerJS "I accept this call, I just have nothing to send back."
         call.answer(this.localStream || new MediaStream());
       } else {
-        // FIX 2: Pass an empty MediaStream instead of nothing.
-        // call.answer() with no args causes PeerJS to skip video codec
-        // negotiation in the SDP answer. The ICE connection succeeds but
-        // the video track is never transferred — producing a permanent black screen.
-        // An empty MediaStream forces proper video negotiation while still
-        // making this a receive-only connection.
+        // FIX: Some browsers require a more active SDP answer for video streams.
+        // We still send an empty stream to avoid sending our own video back,
+        // but we ensure it's handled as a proper receive-only connection.
         call.answer(new MediaStream());
       }
 
@@ -95,7 +83,7 @@ export class PeerManager {
       return;
     }
 
-    console.log(`[PeerManager] Calling ${remoteUserId} (${type})`);
+    console.log(`[PeerManager] Calling ${remoteUserId} (${type}) with ${stream.getTracks().length} tracks`);
     const call = this.peer.call(remoteUserId, stream, { metadata: { type } });
     this.handleCall(call, type);
   }
@@ -103,31 +91,22 @@ export class PeerManager {
   handleCall(call, type) {
     const remoteUserId = call.peer;
 
-    // FIX: If we already have a screen call from this peer, close the old one first.
-    // This prevents overlapping WebRTC connections which cause Android Chrome to
-    // receive a second stream but fail to render it (showing a black screen).
     const existingCalls = this.calls.get(remoteUserId);
     if (existingCalls && existingCalls[type]) {
-      console.log(`[PeerManager] Closing existing ${type} call from ${remoteUserId} before handling new one`);
+      console.log(`[PeerManager] Closing existing ${type} call from ${remoteUserId}`);
       try {
         existingCalls[type].close();
-      } catch (e) {
-        // Ignore close errors on stale calls
-      }
+      } catch (e) {}
       delete existingCalls[type];
     }
 
     call.on('stream', (remoteStream) => {
-      console.log(`[PeerManager] Received remote ${type} stream from: ${remoteUserId}`);
+      const trackCount = remoteStream.getTracks().length;
+      console.log(`[PeerManager] Received remote ${type} stream from ${remoteUserId} with ${trackCount} tracks`);
 
-      // FIX 3: Guard against empty streams from the fix above.
-      // The empty MediaStream we send in answer() comes back here on the
-      // caller's side — ignore it since it has no tracks.
-      if (type === 'screen' && remoteStream.getTracks().length === 0) {
-        console.log('[PeerManager] Ignoring empty stream from screen share answer');
-        return;
-      }
-
+      // FIX: Do NOT ignore empty streams here. In WebRTC, tracks can be added
+      // asynchronously after the 'stream' event fires. The ScreenPlayer now
+      // handles onaddtrack internally to detect when video actually arrives.
       if (this.onRemoteStream) {
         this.onRemoteStream(remoteUserId, remoteStream, type);
       }
@@ -168,7 +147,7 @@ export class PeerManager {
   stopScreenShare() {
     this.calls.forEach((calls) => {
       if (calls.screen) {
-        calls.screen.close();
+        try { calls.screen.close(); } catch(e) {}
       }
     });
     if (this.screenStream) {
@@ -179,8 +158,8 @@ export class PeerManager {
 
   destroy() {
     this.calls.forEach(calls => {
-      if (calls.audio) calls.audio.close();
-      if (calls.screen) calls.screen.close();
+      if (calls.audio) try { calls.audio.close(); } catch(e) {}
+      if (calls.screen) try { calls.screen.close(); } catch(e) {}
     });
     this.calls.clear();
     if (this.peer) this.peer.destroy();

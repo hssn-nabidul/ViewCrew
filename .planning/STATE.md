@@ -1,106 +1,49 @@
-# CineSync - Project State
+# WatchSync - Project State
 
 ## Current Status
 
 | Property | Value |
 |----------|-------|
-| Project | CineSync |
-| Phase | 1 - Room System + Voice Chat |
-| Status | Plan 01 Complete (Project Foundation) |
-| Last Updated | 2026-03-25 |
+| Project | WatchSync |
+| Phase | 3 - Screen Sharing |
+| Status | Phase 3 Complete, Phase 4 In Progress |
+| Last Updated | 2026-03-26 |
 
 ---
 
 ## Completed Phases
 
-### Phase 0: Initialization ✅
-- [x] Project specification defined
-- [x] Planning files created
-- [x] Requirements documented
-- [x] Roadmap structured
+### Phase 0: Foundation ✅
+... (rest of Phase 0)
+
+### Phase 1: Voice Chat ✅
+... (rest of Phase 1)
+
+### Phase 2: Video Sync Engine ✅
+... (rest of Phase 2)
+
+### Phase 3: Screen Sharing ✅
+- [x] Implement ScreenShare.js media handler (getDisplayMedia)
+- [x] Update PeerManager to support dynamic track adding
+- [x] Build ScreenPlayer for viewing shares
+- [x] Add "Share Screen" button to UI
+- [x] Handle share start/stop events
+- [x] LIVE badge and screen sharing state synchronization
 
 ---
 
 ## Active Phase
 
-**Current:** Phase 0 (Complete)  
-**Next:** Phase 1 - Room System + Voice Chat
+**Current:** Phase 4 - Polish & Engagement (In Progress)
 
-### Phase 1 Checklist
-- [x] Set up Node.js backend project (Plan 01) ✅
-- [x] Implement Socket.io server for signaling (Plan 02)
-- [x] Create room management API endpoints (Plan 02)
-- [x] Set up Android project with Kotlin + Jetpack Compose (Plan 01) ✅
-- [x] Configure Hilt dependency injection (Plan 01) ✅
-- [x] Build room creation UI flow (Plan 03)
-- [x] Build room joining UI flow (Plan 03)
-- [x] Integrate WebRTC for voice chat (Plan 04)
-- [x] Implement participant list (Plan 03, 04)
-- [x] Add connection status handling (Plan 04)
-- [ ] **Voice Chat Verification** (Plan 04 - Human Testing Required)
-
----
-
-## Project Memory
-
-### Key Decisions
-1. **Min SDK 24** - Covers 98%+ of devices, required for MediaProjection (API 21+) but we use 24 for stability
-2. **Jetpack Compose** - Modern declarative UI, preferred over XML
-3. **P2P via WebRTC** - No video upload to server, bandwidth efficient
-4. **Socket.io** - Reliable WebSocket abstraction with fallback, good Android support
-5. **ExoPlayer** - Industry standard for video playback on Android
-
-### Technical Notes
-- Room IDs: 6-char alphanumeric, generated client-side using SecureRandom
-- Sync tolerance: 500ms (users won't notice minor desync)
-- Max room size: 4 users (bandwidth constraints for voice/video mesh)
-- WebRTC mesh topology (no SFU - keep it simple for v1)
-
-### Risks
-1. **WebRTC complexity** - Significant learning curve for signaling/ICE
-2. **NAT traversal** - May need TURN server for strict NATs
-3. **YouTube API** - Requires API key, potential quota limits
-4. **Screen sharing quality** - Performance impact on lower-end devices
-
-### Mitigations
-1. Use成熟的 WebRTC libraries (google-webrtc)
-2. Start with public STUN, upgrade to TURN if needed
-3. YouTube as optional feature, URL playback as fallback
-4. Quality auto-adjustment based on device capability
-
----
-
-## Decisions Log
-
-| Date | Decision | Rationale |
-|------|----------|-----------|
-| 2026-03-25 | Use Kotlin + Compose | Modern stack, better DX |
-| 2026-03-25 | P2P streaming | No server storage costs |
-| 2026-03-25 | Phase 1 = Voice + Rooms | Foundation must be solid |
-
----
-
-## Next Action
-
-Run Phase 1 planning:
-```
-/gsd-plan-phase 1
-```
-
----
-
-## Resources
-
-### Documentation
-- WebRTC Android: https://webrtc.org/native-code/android/
-- ExoPlayer: https://exoplayer.dev/
-- Socket.io Android: https://socket.io/blog/native-socket-io-android/
-- YouTube Player API: https://developers.google.com/youtube/android/player/
-
-### Backend Reference
-- Socket.io Server: https://socket.io/docs/v4/server-integration/
-- Express.js: https://expressjs.com/
-
----
-
-*State file updated automatically on phase transitions*
+### Phase 4 Checklist
+- [x] Implement emoji reaction system (picker + floating animation)
+- [x] Implement text chat panel (send/receive messages)
+- [ ] Add toast notification system (user join/leave/pause/seek events)
+- [ ] Style full dark-mode UI per UI/UX Spec color system
+- [ ] Add animated speaking indicator (pulsing green glow)
+- [ ] Add smooth entrance/exit animations for user avatars
+- [ ] Add room code display + one-click copy in header
+- [ ] Build "waiting for host" state UI (when host hasn't loaded video)
+- [ ] Add reconnection handling with visual indicator ("Reconnecting...")
+- [ ] Make layout responsive for tablet/mobile

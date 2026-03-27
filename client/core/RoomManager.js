@@ -251,8 +251,8 @@ export class RoomManager {
         return;
       }
 
-      const videoTracks = rawStream.getVideoTracks();
-      if (videoTracks.length === 0 || videoTracks[0].readyState !== 'live') {
+      const tracks = rawStream.getTracks();
+      if (tracks.length === 0 || tracks[0].readyState !== 'live') {
         console.warn('[RoomManager] Captured stream not ready yet, retrying...');
         if (retries > 0) setTimeout(() => this.refreshLocalStream(videoElement, retries - 1), 500);
         return;
@@ -262,8 +262,13 @@ export class RoomManager {
       
       this.peerManager.stopScreenShare();
       setTimeout(() => {
-        const videoOnlyStream = new MediaStream(videoTracks);
-        this.peerManager.startScreenShare(videoOnlyStream, this.participants.map(p => p.userId));
+        // Mute local video so host doesn't hear their own audio from speakers
+        if (videoElement) {
+          videoElement.muted = true;
+        }
+
+        // Send full stream (video + audio) to remote peers only - they won't receive their own stream
+        this.peerManager.startScreenShare(rawStream, this.participants.map(p => p.userId));
 
         this.socket.emit('sync-event', {
           roomId: this.roomId,

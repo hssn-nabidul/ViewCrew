@@ -23,7 +23,7 @@ export class HTMLVideoPlayer extends PlayerInterface {
       this.video.style.zIndex = '10';
       this.video.controls = false;
       this.video.playsInline = true;
-      this.video.muted = false;
+      this.video.muted = true;
       
       this.video.onplay = () => {
         console.log('[HTMLVideoPlayer] Video playing');

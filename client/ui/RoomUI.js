@@ -27,6 +27,11 @@ export const RoomUI = {
           </div>
           <div class="flex items-center gap-4">
             <span class="text-[10px] font-black uppercase tracking-widest text-tertiary px-3 py-1 bg-tertiary/10 rounded-full border border-tertiary/20">Synced</span>
+            ${isHost ? `
+              <button id="btnOpenSource" class="text-on-surface-variant hover:text-white p-2 rounded-full hover:bg-surface transition-colors">
+                <span class="material-symbols-outlined">add_to_queue</span>
+              </button>
+            ` : ''}
             <button id="btnOpenSettings" class="text-on-surface-variant hover:text-white p-2 rounded-full hover:bg-surface transition-colors">
               <span class="material-symbols-outlined">settings</span>
             </button>
@@ -469,6 +474,23 @@ export const RoomUI = {
     if (btnSettings) {
       btnSettings.onclick = () => {
         RoomUI.currentTab = 'settings';
+        if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
+      };
+    }
+
+    const btnSource = document.querySelector('#btnOpenSource');
+    if (btnSource) {
+      btnSource.onclick = () => {
+        RoomUI.currentTab = 'source';
+        if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
+      };
+    }
+
+    const btnMobileSource = document.querySelector('#btnMobileSource');
+    if (btnMobileSource) {
+      btnMobileSource.onclick = (e) => {
+        e.stopPropagation();
+        RoomUI.currentTab = 'source';
         if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
       };
     }

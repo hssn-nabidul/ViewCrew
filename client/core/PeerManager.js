@@ -181,7 +181,6 @@ export class PeerManager {
       }
     }
   }
-  }
 
   startScreenShare(stream, remoteUserIds) {
     if (!stream) {

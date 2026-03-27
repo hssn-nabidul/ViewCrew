@@ -242,16 +242,16 @@ export class RoomManager {
         return;
       }
 
-      const stream = videoElement.captureStream
+      const rawStream = videoElement.captureStream
         ? videoElement.captureStream()
         : (videoElement.mozCaptureStream ? videoElement.mozCaptureStream() : null);
 
-      if (!stream) {
+      if (!rawStream) {
         console.warn('[RoomManager] Browser does not support captureStream');
         return;
       }
 
-      const videoTracks = stream.getVideoTracks();
+      const videoTracks = rawStream.getVideoTracks();
       if (videoTracks.length === 0 || videoTracks[0].readyState !== 'live') {
         console.warn('[RoomManager] Captured stream not ready yet, retrying...');
         if (retries > 0) setTimeout(() => this.refreshLocalStream(videoElement, retries - 1), 500);
@@ -262,12 +262,8 @@ export class RoomManager {
       
       this.peerManager.stopScreenShare();
       setTimeout(() => {
-        this.peerManager.startScreenShare(stream, this.participants.map(p => p.userId));
-
-        // Mute local video to prevent echo - audio is sent via WebRTC
-        if (videoElement) {
-          videoElement.muted = true;
-        }
+        const videoOnlyStream = new MediaStream(videoTracks);
+        this.peerManager.startScreenShare(videoOnlyStream, this.participants.map(p => p.userId));
 
         this.socket.emit('sync-event', {
           roomId: this.roomId,

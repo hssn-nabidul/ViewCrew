@@ -481,9 +481,11 @@ export const RoomUI = {
     // Video Control Listeners
     const videoSection = document.querySelector('#video-stage');
     const videoControls = document.querySelector('#video-controls');
+    const videoContainer = document.querySelector('#video-container');
     if (videoSection && videoControls) {
       let hideTimeout;
       const showControls = () => {
+        console.log('[RoomUI] showControls called');
         videoControls.classList.remove('opacity-0', 'pointer-events-none');
         videoControls.classList.add('opacity-100');
         clearTimeout(hideTimeout);
@@ -494,7 +496,10 @@ export const RoomUI = {
       };
       videoSection.onclick = showControls;
       videoSection.onmousemove = showControls;
-      videoSection.ontouchstart = showControls;
+      videoSection.ontouchstart = (e) => { console.log('[RoomUI] touchstart'); showControls(); };
+      if (videoContainer) {
+        videoContainer.ontouchstart = (e) => { console.log('[RoomUI] videoContainer touchstart'); showControls(); };
+      }
     }
 
     const btnCenterPlay = document.querySelector('#btnCenterPlayPause');

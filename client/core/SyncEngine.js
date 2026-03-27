@@ -260,6 +260,8 @@ export class SyncEngine {
       console.log('[SyncEngine] Container still not ready for pending source');
       return;
     }
+    
+    console.log('[SyncEngine] Container found, creating player for:', source);
 
     console.log('[SyncEngine] Applying pending source:', this._pendingSource);
     const { source, value } = this._pendingSource;

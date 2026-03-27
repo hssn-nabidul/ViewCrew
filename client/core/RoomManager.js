@@ -20,6 +20,7 @@ export class RoomManager {
     this.participants = [];
     this.onStateChange = null;
     this._pendingScreenStream = null;
+    this.hasEnteredTheater = false;
 
     this.setupListeners();
     this.initVoice();
@@ -87,6 +88,10 @@ export class RoomManager {
   async startScreenShare() {
     const stream = await this.screenShare.start();
     if (stream) {
+      // Auto-enter theater when starting screen share
+      this.hasEnteredTheater = true;
+      if (this.onStateChange) this.onStateChange(this.participants);
+
       this.peerManager.startScreenShare(stream, this.participants.map(p => p.userId));
       this.syncEngine.changeSource('screen', this.userId, this.roomId);
       this.syncEngine.attachScreenStream(stream);

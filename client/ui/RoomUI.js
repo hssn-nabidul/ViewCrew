@@ -588,6 +588,12 @@ export const RoomUI = {
         let source = 'url', val = url;
         const yt = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
         if (yt) { source = 'youtube'; val = yt[1]; }
+        
+        // Auto-enter theater when starting to watch
+        if (!roomManager.hasEnteredTheater) {
+          roomManager.hasEnteredTheater = true;
+        }
+        
         RoomUI.currentTab = 'watch';
         roomManager.syncEngine.changeSource(source, val, roomManager.roomId);
       };

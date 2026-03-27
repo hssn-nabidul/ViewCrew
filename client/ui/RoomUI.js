@@ -494,6 +494,7 @@ export const RoomUI = {
       };
       videoSection.onclick = showControls;
       videoSection.onmousemove = showControls;
+      videoSection.ontouchstart = showControls;
     }
 
     const btnCenterPlay = document.querySelector('#btnCenterPlayPause');

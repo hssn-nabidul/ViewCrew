@@ -500,6 +500,7 @@ export const RoomUI = {
       if (videoContainer) {
         videoContainer.ontouchstart = (e) => { console.log('[RoomUI] videoContainer touchstart'); showControls(); };
       }
+      document.addEventListener('show-video-controls', showControls);
     }
 
     const btnCenterPlay = document.querySelector('#btnCenterPlayPause');

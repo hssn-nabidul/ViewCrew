@@ -282,14 +282,9 @@ export const RoomUI = {
             <div class="bg-black/20 p-4 rounded-2xl flex items-center justify-between border border-white/5 group hover:bg-white/5 transition-colors">
               <div class="flex items-center gap-4">
                 <div class="relative">
-                  <div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center text-xl font-black text-primary border-2 ${p.isSpeaking ? 'border-tertiary shadow-[0_0_15px_rgba(78,222,163,0.3)]' : 'border-white/5'} transition-all">
+                  <div class="w-12 h-12 rounded-full bg-surface-container-high flex items-center justify-center text-xl font-black text-primary border-2 border-white/5 transition-all">
                     ${p.displayName.charAt(0)}
                   </div>
-                  ${p.isSpeaking ? `
-                    <div class="absolute -bottom-1 -right-1 bg-tertiary rounded-full p-1 border-2 border-surface animate-bounce">
-                      <span class="material-symbols-outlined text-[8px] text-on-tertiary" style="font-variation-settings: 'FILL' 1;">mic</span>
-                    </div>
-                  ` : ''}
                 </div>
                 <div>
                   <p class="font-black text-xs text-on-surface tracking-tight">${p.displayName}${p.userId === userId || p.id === userId ? ' <span class="text-primary/60">(You)</span>' : ''}</p>

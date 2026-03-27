@@ -1,9 +1,7 @@
 import { io } from 'socket.io-client';
 import { PeerManager } from './PeerManager';
 import { SyncEngine } from './SyncEngine';
-import { VoiceChat } from '../media/VoiceChat';
 import { ScreenShare } from '../media/ScreenShare';
-import { VAD } from '../media/VAD';
 
 export class RoomManager {
   constructor(apiUrl, userId, displayName) {
@@ -13,9 +11,7 @@ export class RoomManager {
     this.socket = io(apiUrl);
     this.peerManager = new PeerManager(apiUrl, userId);
     this.syncEngine = null;
-    this.voiceChat = new VoiceChat();
     this.screenShare = new ScreenShare();
-    this.vad = null;
     this.roomId = null;
     this.participants = [];
     this.onStateChange = null;
@@ -23,14 +19,12 @@ export class RoomManager {
     this.hasEnteredTheater = false;
 
     this.setupListeners();
-    this.initVoice();
+    this.setupPeerManagerCallbacks();
   }
 
-  async initVoice() {
+  setupPeerManagerCallbacks() {
     this.peerManager.onRemoteStream = (remoteUserId, remoteStream, type) => {
-      if (type === 'audio') {
-        this.handleRemoteAudioStream(remoteUserId, remoteStream);
-      } else if (type === 'screen') {
+      if (type === 'screen') {
         console.log('[RoomManager] Screen stream received from peer:', remoteUserId);
 
         if (this.syncEngine) {
@@ -48,41 +42,6 @@ export class RoomManager {
         this._pendingScreenStream = null;
       }
     };
-
-    const stream = await this.voiceChat.initLocalStream();
-    if (stream) {
-      this.peerManager.setLocalStream(stream);
-
-      this.vad = new VAD(stream, (isSpeaking) => {
-        if (this.roomId) {
-          this.socket.emit('user-speaking', { roomId: this.roomId, userId: this.userId, isSpeaking });
-        }
-        const localUser = this.participants.find(p => p.userId === this.userId);
-        if (localUser) {
-          localUser.isSpeaking = isSpeaking;
-          if (this.onStateChange) this.onStateChange(this.participants);
-        }
-      });
-    }
-  }
-
-  handleRemoteAudioStream(remoteUserId, remoteStream) {
-    if (remoteUserId === this.userId) return;
-
-    let audio = document.getElementById(`audio-${remoteUserId}`);
-    if (!audio) {
-      audio = document.createElement('audio');
-      audio.id = `audio-${remoteUserId}`;
-      audio.autoplay = true;
-      audio.style.display = 'none';
-      document.body.appendChild(audio);
-    }
-    if (audio.srcObject !== remoteStream) {
-      audio.srcObject = remoteStream;
-      audio.play().catch(err => {
-        console.warn(`[RoomManager] Audio autoplay blocked for ${remoteUserId}:`, err);
-      });
-    }
   }
 
   async startScreenShare() {
@@ -147,8 +106,7 @@ export class RoomManager {
         this.participants.push(user);
 
         if (user.userId !== this.userId) {
-          this.peerManager.callPeer(user.userId, 'audio');
-
+          // Only call for screen share if active
           if (this.screenShare.isActive()) {
             this.peerManager.callPeer(user.userId, 'screen');
           }
@@ -162,18 +120,7 @@ export class RoomManager {
       console.log(`[RoomManager] User left: ${leftUserId}`);
       this.participants = this.participants.filter(p => p.userId !== leftUserId);
 
-      const audio = document.getElementById(`audio-${leftUserId}`);
-      if (audio) audio.remove();
-
       if (this.onStateChange) this.onStateChange(this.participants);
-    });
-
-    this.socket.on('user-speaking', ({ userId, isSpeaking }) => {
-      const user = this.participants.find(p => p.userId === userId || p.id === userId);
-      if (user) {
-        user.isSpeaking = isSpeaking;
-        if (this.onStateChange) this.onStateChange(this.participants);
-      }
     });
 
     this.socket.on('chat-message', (data) => {
@@ -286,7 +233,7 @@ export class RoomManager {
       
       if (videoElement.videoWidth <= requiredWidth && retries > 0) {
         console.log(`[RoomManager] Waiting for video dimensions...`);
-        setTimeout(() => this.refreshLocalStream(videoElement, retries - 1), 1000); // Wait longer for mobile
+        setTimeout(() => this.refreshLocalStream(videoElement, retries - 1), 1000);
         return;
       }
 
@@ -311,8 +258,6 @@ export class RoomManager {
         return;
       }
 
-      // FIX: Increase delay to 1500ms for mobile. 
-      // This ensures the previous session's decoder is fully released.
       const cleanupDelay = isMobile ? 1500 : 800;
       
       this.peerManager.stopScreenShare();

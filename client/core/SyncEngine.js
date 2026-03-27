@@ -14,7 +14,8 @@ export class SyncEngine {
     this.DRIFT_THRESHOLD = 3;
     this.SYNC_INTERVAL = 5000;
     this.onSourceLoaded = null;
-    this._pendingStream = null; // FIX: buffer stream if it arrives before player is ready
+    this._pendingStream = null;
+    this._pendingSource = null;
 
     this.setupListeners();
   }
@@ -59,29 +60,28 @@ export class SyncEngine {
   loadSource(source, value) {
     console.log('[SyncEngine] Loading source:', source, value ? '(value provided)' : '(no value)');
 
+    const container = document.getElementById(this.containerId);
+
     if (this.currentSource === source) {
       if (source === 'screen') {
         this.currentSourceValue = value;
-        if (this.player && this.player.video) {
-          const container = document.getElementById(this.containerId);
-          if (container && !container.contains(this.player.video)) {
+        if (this.player && this.player.video && container) {
+          if (!container.contains(this.player.video)) {
             container.innerHTML = '';
             container.appendChild(this.player.video);
-            this.player.play();
           }
+          this.player.play();
         }
         return;
       } else if (this.currentSourceValue === value) {
-        if (this.player && this.player.video) {
-          const container = document.getElementById(this.containerId);
-          if (container && !container.contains(this.player.video)) {
+        if (this.player && this.player.video && container) {
+          if (!container.contains(this.player.video)) {
             container.innerHTML = '';
             container.appendChild(this.player.video);
             this.player.play();
           }
-        } else if (source === 'youtube' && this.player) {
-          const container = document.getElementById(this.containerId);
-          if (container && !container.querySelector('iframe')) {
+        } else if (source === 'youtube' && this.player && container) {
+          if (!container.querySelector('iframe')) {
             this.player.destroy();
             const onEvent = (type, data) => this.onPlayerEvent(type, data);
             this.player = new YouTubePlayer(this.containerId, onEvent);
@@ -95,9 +95,16 @@ export class SyncEngine {
     if (this.player) {
       console.log('[SyncEngine] Destroying existing player');
       this.player.destroy();
+      this.player = null;
     }
     this.currentSource = source;
     this.currentSourceValue = value;
+
+    if (!container) {
+      console.warn('[SyncEngine] Container not found, buffering source:', source);
+      this._pendingSource = { source, value };
+      return;
+    }
 
     const onEvent = (type, data) => this.onPlayerEvent(type, data);
     const onReady = () => {
@@ -106,12 +113,6 @@ export class SyncEngine {
         this.onSourceLoaded(source, value);
       }
     };
-
-    const container = document.getElementById(this.containerId);
-    if (!container) {
-      console.error('[SyncEngine] Container not found:', this.containerId);
-      return;
-    }
 
     const existingBadge = document.querySelector('#live-badge');
     if (source === 'screen') {
@@ -177,7 +178,6 @@ export class SyncEngine {
   attachScreenStream(stream) {
     console.log('[SyncEngine] Attaching screen stream');
 
-    // CRITICAL FIX: Validate the stream before using it
     if (!stream) {
       console.error('[SyncEngine] attachScreenStream called with null stream');
       return;
@@ -196,30 +196,88 @@ export class SyncEngine {
     console.log(`[SyncEngine] ${liveTracks.length} video tracks are live`);
 
     if (this.currentSource !== 'screen') {
-      // Player doesn't exist yet — buffer the stream and let loadSource apply it
       this._pendingStream = stream;
       this.loadSource('screen', null);
       return;
     }
 
+    const container = document.getElementById(this.containerId);
+    if (!container) {
+      console.warn('[SyncEngine] Container not ready, buffering stream');
+      this._pendingStream = stream;
+      return;
+    }
+
     if (this.player && this.player.load) {
-      // FIX: Always load the new stream even if currentSource is already 'screen'.
-      // This handles reconnection scenarios (e.g. host's refreshLocalStream) where
-      // a new stream replaces the old one. ScreenPlayer.load() is now smart enough
-      // to detect same-stream vs new-stream internally.
       this.player.load(stream);
 
-      // FIX: Viewers must explicitly call play() — onPlayerEvent is gated to host only.
-      // Add a short delay so Android Chrome's media pipeline can settle after srcObject change.
       if (!this.isHost) {
         setTimeout(() => {
           if (this.player) this.player.play();
         }, 300);
       }
     } else {
-      // Player not ready yet, buffer the stream
       console.warn('[SyncEngine] ScreenPlayer not ready, buffering stream');
       this._pendingStream = stream;
+    }
+  }
+
+  tryApplyPendingSource() {
+    if (!this._pendingSource) return;
+    
+    const container = document.getElementById(this.containerId);
+    if (!container) {
+      console.log('[SyncEngine] Container still not ready for pending source');
+      return;
+    }
+
+    console.log('[SyncEngine] Applying pending source:', this._pendingSource);
+    const { source, value } = this._pendingSource;
+    this._pendingSource = null;
+    
+    if (this.player) {
+      this.player.destroy();
+      this.player = null;
+    }
+    
+    this.currentSource = source;
+    this.currentSourceValue = value;
+    
+    const onEvent = (type, data) => this.onPlayerEvent(type, data);
+    const onReady = () => {
+      if (this.onSourceLoaded) {
+        this.onSourceLoaded(source, value);
+      }
+    };
+
+    const existingBadge = document.querySelector('#live-badge');
+    if (source === 'screen') {
+      if (!existingBadge) {
+        const badge = document.createElement('div');
+        badge.id = 'live-badge';
+        badge.className = 'absolute top-4 left-4 px-2 py-1 bg-red-600 text-white text-[10px] font-bold rounded uppercase tracking-wider animate-pulse z-10';
+        badge.textContent = 'LIVE';
+        container.appendChild(badge);
+      }
+    } else if (existingBadge) {
+      existingBadge.remove();
+    }
+
+    if (source === 'youtube') {
+      this.player = new YouTubePlayer(this.containerId, onEvent, onReady);
+      this.player.load(value);
+    } else if (source === 'url' || source === 'local') {
+      this.player = new HTMLVideoPlayer(this.containerId, onEvent);
+      this.player.load(value);
+      onReady();
+    } else if (source === 'screen') {
+      this.player = new ScreenPlayer(this.containerId, onEvent);
+      if (this._pendingStream) {
+        console.log('[SyncEngine] Applying buffered stream to new ScreenPlayer');
+        this.player.load(this._pendingStream);
+        this._pendingStream = null;
+      }
+      onReady();
     }
   }
 }

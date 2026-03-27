@@ -23,6 +23,11 @@ const render = () => {
     app.innerHTML = RoomUI.render(roomId, roomManager.participants, userId, currentSource, roomManager.hasEnteredTheater);
     RoomUI.initListeners(roomManager);
 
+    // Apply any pending source now that the container should exist in the DOM
+    if (roomManager.syncEngine && roomManager.syncEngine.tryApplyPendingSource) {
+      roomManager.syncEngine.tryApplyPendingSource();
+    }
+    
     // Re-attach player if it already existed (handles full re-renders)
     if (currentSource && roomManager.syncEngine) {
       roomManager.syncEngine.loadSource(currentSource, currentSourceValue);

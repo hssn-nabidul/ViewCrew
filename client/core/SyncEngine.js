@@ -16,6 +16,7 @@ export class SyncEngine {
     this.onSourceLoaded = null;
     this._pendingStream = null;
     this._pendingSource = null;
+    this._isLoadingScreen = false;
 
     this.setupListeners();
   }
@@ -136,6 +137,7 @@ export class SyncEngine {
       onReady();
     } else if (source === 'screen') {
       this.player = new ScreenPlayer(this.containerId, onEvent);
+      this._isLoadingScreen = false;
       if (this._pendingStream) {
         console.log('[SyncEngine] Applying buffered pending stream to new ScreenPlayer');
         this.player.load(this._pendingStream);
@@ -195,13 +197,20 @@ export class SyncEngine {
     const liveTracks = videoTracks.filter(t => t.readyState === 'live');
     console.log(`[SyncEngine] ${liveTracks.length} video tracks are live`);
 
+    const container = document.getElementById(this.containerId);
+    
+    // If source is not 'screen' yet, load the source first and buffer the stream
     if (this.currentSource !== 'screen') {
       this._pendingStream = stream;
-      this.loadSource('screen', null);
+      // Only call loadSource if we haven't already started loading
+      if (!this._isLoadingScreen) {
+        this._isLoadingScreen = true;
+        this.loadSource('screen', null);
+      }
       return;
     }
 
-    const container = document.getElementById(this.containerId);
+    // Source is already 'screen', just attach the stream to the player
     if (!container) {
       console.warn('[SyncEngine] Container not ready, buffering stream');
       this._pendingStream = stream;

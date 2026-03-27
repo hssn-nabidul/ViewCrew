@@ -23,7 +23,7 @@ export class HTMLVideoPlayer extends PlayerInterface {
       this.video.style.zIndex = '10';
       this.video.controls = false;
       this.video.playsInline = true;
-      this.video.muted = false; // Must be false so the host can hear the local video
+      this.video.muted = true; // Start muted - audio will be sent via WebRTC after capture
       
       this.video.onplay = () => {
         console.log('[HTMLVideoPlayer] Video playing');

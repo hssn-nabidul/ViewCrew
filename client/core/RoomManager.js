@@ -264,6 +264,11 @@ export class RoomManager {
       setTimeout(() => {
         this.peerManager.startScreenShare(stream, this.participants.map(p => p.userId));
 
+        // Mute local video to prevent echo - audio is sent via WebRTC
+        if (videoElement) {
+          videoElement.muted = true;
+        }
+
         this.socket.emit('sync-event', {
           roomId: this.roomId,
           type: 'source-change',

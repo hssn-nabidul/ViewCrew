@@ -40,18 +40,7 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-// Serve static frontend in production
-const clientPath = path.join(__dirname, '../../client/dist');
-app.use(express.static(clientPath));
-
-// Fallback to index.html for SPA routing
-app.get('*', (req: Request, res: Response) => {
-  if (req.path.startsWith('/api')) {
-    res.status(404).json({ error: 'NOT_FOUND', message: 'Endpoint not found' });
-  } else {
-    res.sendFile(path.join(clientPath, 'index.html'));
-  }
-});
+// API-only mode - frontend served separately on Netlify
 
 // Setup WebSocket handlers
 setupSocketHandlers(io);

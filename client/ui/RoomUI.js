@@ -610,13 +610,25 @@ export const RoomUI = {
       inputLocal.onchange = (e) => {
         const file = e.target.files[0];
         if (file) {
-          // Auto-enter theater and trigger re-render
+          const blobUrl = URL.createObjectURL(file);
+          
+          // Auto-enter theater
           if (!roomManager.hasEnteredTheater) {
             roomManager.hasEnteredTheater = true;
-            if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
           }
-          RoomUI.currentTab = 'watch';
-          roomManager.syncEngine.changeSource('local', URL.createObjectURL(file), roomManager.roomId);
+          
+          // Set pending source directly on syncEngine to update state before re-render
+          if (roomManager.syncEngine) {
+            roomManager.syncEngine._pendingSource = { source: 'local', value: blobUrl };
+            roomManager.syncEngine.currentSource = 'local';
+            roomManager.syncEngine.currentSourceValue = blobUrl;
+          }
+          
+          // Trigger re-render BEFORE changeSource so container exists
+          if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
+          
+          // Now change the source
+          roomManager.syncEngine.changeSource('local', blobUrl, roomManager.roomId);
         }
       };
     }

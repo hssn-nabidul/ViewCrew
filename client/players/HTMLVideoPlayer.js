@@ -38,47 +38,42 @@ export class HTMLVideoPlayer extends PlayerInterface {
         console.log('[HTMLVideoPlayer] Video loaded data');
         this.onEvent('ready', null);
         
-        const playPromise = this.video.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(() => {
-            console.warn('[HTMLVideoPlayer] Unmuted autoplay blocked, retrying muted');
-            this.video.muted = true;
-            this.video.play()
-              .then(() => this.showPlayOverlay()) // show overlay so host can unmute
-              .catch(err => {
-                console.error('[HTMLVideoPlayer] Muted play also failed:', err);
-                this.showPlayOverlay();
-              });
-          });
-        }
+        // Try to play automatically
+        this._attemptPlay();
       };
       this.video.onwaiting = () => console.log('[HTMLVideoPlayer] Video buffering');
       this.video.onerror = (e) => console.error('[HTMLVideoPlayer] Video error:', e);
-    }
-
-    // Always ensure video is in the current container (it might have been re-rendered)
-    if (!container.contains(this.video)) {
-      console.log('[HTMLVideoPlayer] Attaching video to container');
+      
       container.innerHTML = '';
       container.appendChild(this.video);
     }
 
     if (url && this.video.src !== url) {
+      console.log('[HTMLVideoPlayer] Setting new source');
       this.video.src = url;
       this.video.load();
+    } else if (url && this.video.src === url && this.video.paused) {
+      // Same source, try to play
+      this._attemptPlay();
+    }
+  }
+  
+  _attemptPlay() {
+    if (!this.video) return;
+    
+    const playPromise = this.video.play();
+    if (playPromise !== undefined) {
+      playPromise.catch(err => {
+        console.warn('[HTMLVideoPlayer] Play failed:', err.message);
+        // Don't show overlay on failure - this is expected for muted videos
+      });
     }
   }
 
   play() { 
     console.log('[HTMLVideoPlayer] Play requested');
     if (this.video) {
-      const playPromise = this.video.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(err => {
-          console.warn('[HTMLVideoPlayer] Play failed, showing overlay:', err);
-          this.showPlayOverlay();
-        });
-      }
+      this._attemptPlay();
     } else {
       console.warn('[HTMLVideoPlayer] Play requested but no video element');
     }
@@ -99,10 +94,7 @@ export class HTMLVideoPlayer extends PlayerInterface {
     `;
     
     overlay.onclick = () => {
-      if (this.video) {
-        this.video.muted = false; // Ensure unmuted on tap
-        this.video.play().catch(console.error);
-      }
+      this._attemptPlay();
       overlay.style.opacity = '0';
       setTimeout(() => overlay.remove(), 300);
     };

@@ -1,10 +1,11 @@
 import { PlayerInterface } from './PlayerInterface';
 
 export class YouTubePlayer extends PlayerInterface {
-  constructor(containerId, onEvent) {
+  constructor(containerId, onEvent, onReady) {
     super(containerId, onEvent);
     this.player = null;
     this.isReady = false;
+    this.onReady = onReady;
     this.initAPI();
   }
 
@@ -22,8 +23,10 @@ export class YouTubePlayer extends PlayerInterface {
       firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
     }
 
+    const originalCallback = window.onYouTubeIframeAPIReady;
     window.onYouTubeIframeAPIReady = () => {
       this.isReady = true;
+      if (originalCallback) originalCallback();
     };
   }
 
@@ -35,6 +38,7 @@ export class YouTubePlayer extends PlayerInterface {
 
     if (this.player) {
       this.player.loadVideoById(videoId);
+      if (this.onReady) this.onReady();
     } else {
       this.player = new window.YT.Player(this.containerId, {
         height: '100%',
@@ -48,6 +52,8 @@ export class YouTubePlayer extends PlayerInterface {
         },
         events: {
           onReady: () => {
+            console.log('[YouTubePlayer] Player ready');
+            if (this.onReady) this.onReady();
             this.onEvent('ready', null);
           },
           onStateChange: (event) => {

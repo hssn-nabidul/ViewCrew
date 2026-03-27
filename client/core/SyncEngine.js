@@ -100,6 +100,12 @@ export class SyncEngine {
     this.currentSourceValue = value;
 
     const onEvent = (type, data) => this.onPlayerEvent(type, data);
+    const onReady = () => {
+      console.log('[SyncEngine] Player ready, triggering onSourceLoaded');
+      if (this.onSourceLoaded) {
+        this.onSourceLoaded(source, value);
+      }
+    };
 
     const container = document.getElementById(this.containerId);
     if (!container) {
@@ -121,24 +127,20 @@ export class SyncEngine {
     }
 
     if (source === 'youtube') {
-      this.player = new YouTubePlayer(this.containerId, onEvent);
+      this.player = new YouTubePlayer(this.containerId, onEvent, onReady);
       this.player.load(value);
     } else if (source === 'url' || source === 'local') {
       this.player = new HTMLVideoPlayer(this.containerId, onEvent);
       this.player.load(value);
+      onReady();
     } else if (source === 'screen') {
       this.player = new ScreenPlayer(this.containerId, onEvent);
-      // FIX: If a stream was buffered while the player wasn't ready yet, apply it now
       if (this._pendingStream) {
         console.log('[SyncEngine] Applying buffered pending stream to new ScreenPlayer');
         this.player.load(this._pendingStream);
         this._pendingStream = null;
       }
-    }
-
-    if (this.onSourceLoaded) {
-      console.log('[SyncEngine] Triggering onSourceLoaded');
-      this.onSourceLoaded(source, value);
+      onReady();
     }
   }
 

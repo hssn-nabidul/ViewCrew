@@ -106,6 +106,8 @@ export class SyncEngine {
       console.warn('[SyncEngine] Container not found, buffering source:', source);
       this._pendingSource = { source, value };
       this._isLoadingSource = false;
+      // Try to apply pending source immediately - container might exist now
+      this.tryApplyPendingSource();
       return;
     }
     

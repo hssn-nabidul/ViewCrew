@@ -80,6 +80,9 @@ export class RoomManager {
       this.participants = state.participants;
       this.roomId = state.roomId;
 
+      // Mark as having entered the room (theater mode)
+      this.hasEnteredTheater = true;
+
       const isHost = state.hostId === this.userId;
       if (!this.syncEngine) {
         this.syncEngine = new SyncEngine(this.socket, 'video-container', isHost, this.roomId);

@@ -19,12 +19,15 @@ const render = () => {
   if (roomId) {
     const currentSource = roomManager.syncEngine ? roomManager.syncEngine.currentSource : null;
     const currentSourceValue = roomManager.syncEngine ? roomManager.syncEngine.currentSourceValue : null;
+    const hasEnteredTheater = roomManager.hasEnteredTheater;
     
-    console.log('[render] Rendering, hasEnteredTheater:', roomManager.hasEnteredTheater, 'currentSource:', currentSource);
-    app.innerHTML = RoomUI.render(roomId, roomManager.participants, userId, currentSource, roomManager.hasEnteredTheater);
+    console.log('[render] Rendering, hasEnteredTheater:', hasEnteredTheater, 'currentSource:', currentSource);
+    app.innerHTML = RoomUI.render(roomId, roomManager.participants, userId, currentSource, hasEnteredTheater);
     
     const container = document.getElementById('video-container');
-    console.log('[render] Container exists:', !!container);
+    const lobbyView = document.querySelector('[data-lobby]');
+    console.log('[render] Container exists:', !!container, 'Lobby exists:', !!lobbyView);
+    console.log('[render] Active view:', RoomUI.currentTab);
     RoomUI.initListeners(roomManager);
 
     // Apply any pending source now that the container should exist in the DOM

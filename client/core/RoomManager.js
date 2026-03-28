@@ -268,6 +268,25 @@ export class RoomManager {
         return;
       }
 
+      // Apply high-quality constraints to improve stream quality
+      tracks.forEach(track => {
+        if (track.kind === 'video') {
+          const currentSettings = track.getSettings();
+          console.log('[RoomManager] Video track settings:', currentSettings);
+          
+          // Try to get higher quality - request 720p or native resolution
+          track.applyConstraints({
+            width: { ideal: 1280, max: 1920 },
+            height: { ideal: 720, max: 1080 },
+            frameRate: { ideal: 30 }
+          }).then(() => {
+            console.log('[RoomManager] Video constraints applied, new settings:', track.getSettings());
+          }).catch(err => {
+            console.warn('[RoomManager] Could not apply video constraints:', err);
+          });
+        }
+      });
+
       const cleanupDelay = isMobile ? 1500 : 800;
       
       this.peerManager.stopScreenShare();

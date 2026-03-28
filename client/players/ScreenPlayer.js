@@ -62,9 +62,19 @@ export class ScreenPlayer extends PlayerInterface {
   _tryPlay(retries = 5) {
     if (!this.video) return;
 
-    // Don't force mute - let audio play
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    
+    // On mobile, start muted then unmute after play starts
+    if (isMobile) {
+      this.video.muted = true;
+    }
+    
     this.video.play()
       .then(() => {
+        // Unmute after play starts (mobile needs user interaction)
+        if (isMobile) {
+          this.video.muted = false;
+        }
         this._forceRenderingKick();
       })
       .catch((err) => {
@@ -204,13 +214,24 @@ export class ScreenPlayer extends PlayerInterface {
       <span class="text-white font-black tracking-[0.2em] uppercase text-xl drop-shadow-lg text-center px-6">Tap to Start Watching</span>
     `;
 
-    overlay.onclick = () => {
+    const startPlayback = () => {
       if (this.video) {
         this.video.muted = false;
-        this.video.play().catch(console.error);
+        this.video.play().then(() => {
+          this._forceRenderingKick();
+        }).catch(err => {
+          console.warn('[ScreenPlayer] Play still failed:', err);
+        });
       }
       overlay.style.opacity = '0';
       setTimeout(() => overlay.remove(), 300);
+    };
+
+    // Handle both click and touch for mobile
+    overlay.onclick = startPlayback;
+    overlay.ontouchstart = (e) => {
+      e.preventDefault();
+      startPlayback();
     };
 
     container.appendChild(overlay);

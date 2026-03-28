@@ -6,55 +6,79 @@ export class YouTubePlayer extends PlayerInterface {
     this.player = null;
     this.isReady = false;
     this.onReady = onReady;
+    this._loadAttempts = 0;
+    this._maxAttempts = 50;
     this.initAPI();
   }
 
   initAPI() {
     if (window.YT && window.YT.Player) {
+      console.log('[YouTubePlayer] API already loaded');
       this.isReady = true;
       return;
     }
 
     if (!document.getElementById('yt-api-script')) {
+      console.log('[YouTubePlayer] Loading YouTube IFrame API...');
       const tag = document.createElement('script');
       tag.id = 'yt-api-script';
       tag.src = "https://www.youtube.com/iframe_api";
+      tag.onerror = (e) => console.error('[YouTubePlayer] Failed to load YouTube API:', e);
       const firstScriptTag = document.getElementsByTagName('script')[0];
       firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
     }
 
-    const originalCallback = window.onYouTubeIframeAPIReady;
     window.onYouTubeIframeAPIReady = () => {
+      console.log('[YouTubePlayer] YouTube API ready');
       this.isReady = true;
-      if (originalCallback) originalCallback();
     };
   }
 
   load(videoId) {
+    console.log('[YouTubePlayer] Load called, videoId:', videoId, 'isReady:', this.isReady);
+    
     if (!this.isReady) {
-      setTimeout(() => this.load(videoId), 100);
+      this._loadAttempts++;
+      if (this._loadAttempts > this._maxAttempts) {
+        console.error('[YouTubePlayer] Max load attempts reached, YouTube API not ready');
+        return;
+      }
+      console.log('[YouTubePlayer] Waiting for API... attempt', this._loadAttempts);
+      setTimeout(() => this.load(videoId), 200);
       return;
     }
 
     if (this.player) {
+      console.log('[YouTubePlayer] Using existing player, loading video:', videoId);
       this.player.loadVideoById(videoId);
       if (this.onReady) this.onReady();
     } else {
+      console.log('[YouTubePlayer] Creating new player for video:', videoId);
+      const container = document.getElementById(this.containerId);
+      if (!container) {
+        console.error('[YouTubePlayer] Container not found:', this.containerId);
+        return;
+      }
+      
       this.player = new window.YT.Player(this.containerId, {
         height: '100%',
         width: '100%',
         videoId: videoId,
         playerVars: {
           autoplay: 0,
-          controls: 0,
+          controls: 1,
           modestbranding: 1,
-          rel: 0
+          rel: 0,
+          playsinline: 1
         },
         events: {
           onReady: () => {
             console.log('[YouTubePlayer] Player ready');
             if (this.onReady) this.onReady();
             this.onEvent('ready', null);
+          },
+          onError: (event) => {
+            console.error('[YouTubePlayer] YouTube player error:', event.data);
           },
           onStateChange: (event) => {
             let type;

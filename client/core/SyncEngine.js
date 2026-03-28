@@ -196,7 +196,7 @@ export class SyncEngine {
   }
 
   attachScreenStream(stream) {
-    console.log('[SyncEngine] Attaching screen stream');
+    console.log('[SyncEngine] Attaching screen stream, currentSource:', this.currentSource, 'player:', !!this.player);
 
     if (!stream) {
       console.error('[SyncEngine] attachScreenStream called with null stream');
@@ -216,9 +216,11 @@ export class SyncEngine {
     console.log(`[SyncEngine] ${liveTracks.length} video tracks are live`);
 
     const container = document.getElementById(this.containerId);
+    console.log('[SyncEngine] Container exists:', !!container);
     
     // If source is not 'screen' yet, load the source first and buffer the stream
     if (this.currentSource !== 'screen') {
+      console.log('[SyncEngine] Source is not screen yet, buffering stream and loading screen');
       this._pendingStream = stream;
       // Only call loadSource if we haven't already started loading
       if (!this._isLoadingScreen) {
@@ -236,10 +238,12 @@ export class SyncEngine {
     }
 
     if (this.player && this.player.load) {
+      console.log('[SyncEngine] Calling player.load with stream');
       this.player.load(stream);
 
       if (!this.isHost) {
         setTimeout(() => {
+          console.log('[SyncEngine] Calling player.play after stream attach');
           if (this.player) this.player.play();
         }, 300);
       }

@@ -24,6 +24,7 @@ export class RoomManager {
 
   setupPeerManagerCallbacks() {
     this.peerManager.onRemoteStream = (remoteUserId, remoteStream, type) => {
+      console.log('[RoomManager] onRemoteStream called:', { remoteUserId, type, hasStream: !!remoteStream });
       if (type === 'screen') {
         console.log('[RoomManager] Screen stream received from peer:', remoteUserId);
 

@@ -19,7 +19,6 @@ const roomManager = new RoomManager(API_URL, userId, displayName);
 let cleanupRender = null;
 let lastSource = null;
 let lastEnteredTheater = false;
-let _initializedState = false;
 
 // Save YouTube player state before re-render
 let _savedYouTubeState = null;
@@ -33,7 +32,6 @@ const cleanup = () => {
     roomManager.syncEngine.cleanup();
   }
   roomManager.destroy();
-  _initializedState = false;
   lastSource = null;
   lastEnteredTheater = false;
   _savedYouTubeState = null;
@@ -85,13 +83,9 @@ const render = () => {
       }
     }
     
-    // Initialize state tracking on first render
-    if (!_initializedState) {
-      lastSource = currentSource;
-      lastEnteredTheater = currentSource ? roomManager.hasEnteredTheater : false;
-      _initializedState = true;
-      console.log('[render] Initialized state tracking - lastSource:', lastSource, 'lastEnteredTheater:', lastEnteredTheater);
-    }
+    // Always update state tracking after render
+    lastSource = currentSource;
+    lastEnteredTheater = hasEnteredTheater;
     
     roomManager.onStateChange = (participants) => {
       const newSource = roomManager.syncEngine ? roomManager.syncEngine.currentSource : null;
@@ -104,7 +98,7 @@ const render = () => {
       console.log('[onStateChange] sourceChanged:', sourceChanged, 'theaterChanged:', theaterChanged, 'lastSource:', lastSource, 'lastEnteredTheater:', lastEnteredTheater);
       console.log('[onStateChange] Participants:', participants?.length);
       
-      // Skip if nothing actually changed
+      // Skip if nothing actually changed (participant joins don't need re-render)
       if (!sourceChanged && !theaterChanged) {
         console.log('[onStateChange] Skipping re-render - no changes');
         return;
@@ -126,8 +120,6 @@ const render = () => {
       // Re-render if source OR hasEnteredTheater changed
       if (sourceChanged || theaterChanged) {
         console.log('[onStateChange] Triggering re-render due to:', sourceChanged ? 'source change' : 'theater change');
-        lastSource = newSource;
-        lastEnteredTheater = newEnteredTheater;
         render(); 
       } else {
         console.log('[onStateChange] Skipping re-render - participant change only');

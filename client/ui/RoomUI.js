@@ -634,7 +634,7 @@ export const RoomUI = {
   },
 
   renderMessageHtml: (msg, userId) => {
-    const isMe = msg.userId === userId || msg.id === userId;
+    const isMe = msg.isMe;
     const timeStr = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const fullTimestamp = new Date(msg.timestamp).toLocaleString();
 

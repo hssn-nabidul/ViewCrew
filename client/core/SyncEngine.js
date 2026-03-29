@@ -284,6 +284,18 @@ export class SyncEngine {
     this._isLoadingScreen = false;
     this._justAppliedPending = true;
     
+    // Emit source-change event to viewers if we're the host
+    if (this.isHost && source !== 'local') {
+      console.log('[SyncEngine] Emitting source-change event to viewers');
+      this.socket.emit('sync-event', {
+        roomId: this.roomId,
+        type: 'source-change',
+        source,
+        sourceValue: value,
+        time: 0
+      });
+    }
+    
     console.log('[SyncEngine] Container found, creating player for:', source);
     
     if (this.player) {

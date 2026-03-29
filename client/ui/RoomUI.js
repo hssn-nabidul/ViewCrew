@@ -751,7 +751,7 @@ export const RoomUI = {
           }
           
           // Trigger re-render for settings/source tabs or non-chat mobile tabs
-          if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
+          render();
         }
       };
     });
@@ -768,7 +768,7 @@ export const RoomUI = {
     if (btnSettings) {
       btnSettings.onclick = () => {
         RoomUI.currentTab = 'settings';
-        if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
+        render();
       };
     }
 
@@ -778,7 +778,7 @@ export const RoomUI = {
       btnSource.onclick = () => {
         console.log('[RoomUI] btnOpenSource clicked, setting currentTab to source');
         RoomUI.currentTab = 'source';
-        if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
+        render();
       };
     }
 
@@ -787,7 +787,7 @@ export const RoomUI = {
       btnMobileSource.onclick = (e) => {
         e.stopPropagation();
         RoomUI.currentTab = 'source';
-        if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
+        render();
       };
     }
 

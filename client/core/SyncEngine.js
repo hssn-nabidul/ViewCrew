@@ -74,6 +74,8 @@ export class SyncEngine {
     this._pendingCurrentTime = currentTime;
     this._pendingIsPlaying = isPlaying;
     
+    console.log('[SyncEngine] loadSource called:', { source, value, currentTime, isPlaying, isHost: this.isHost });
+    
     // Skip if we just applied pending source (player already created)
     if (this._justAppliedPending) {
       if (this._playerInitDone) {
@@ -157,6 +159,8 @@ export class SyncEngine {
       // Seek to the current playback position for late joiners
       const pendingTime = this._pendingCurrentTime || 0;
       const shouldPlay = this._pendingIsPlaying;
+      
+      console.log('[SyncEngine] onReady - pendingTime:', pendingTime, 'shouldPlay:', shouldPlay);
       
       if (pendingTime > 0 && this.player) {
         console.log('[SyncEngine] Seeking to current playback position:', pendingTime);

@@ -85,6 +85,13 @@ const render = () => {
       const newSource = roomManager.syncEngine ? roomManager.syncEngine.currentSource : null;
       const newEnteredTheater = roomManager.hasEnteredTheater;
       
+      const sourceChanged = newSource !== lastSource;
+      const theaterChanged = newEnteredTheater !== lastEnteredTheater;
+      
+      console.log('[onStateChange] Called - source:', newSource, 'theater:', newEnteredTheater);
+      console.log('[onStateChange] sourceChanged:', sourceChanged, 'theaterChanged:', theaterChanged);
+      console.log('[onStateChange] Participants:', participants?.length);
+      
       // Save YouTube player state before re-render
       if (newSource === 'youtube' && roomManager.syncEngine && roomManager.syncEngine.player) {
         const player = roomManager.syncEngine.player;
@@ -93,18 +100,20 @@ const render = () => {
           currentTime: player.getCurrentTime ? player.getCurrentTime() : 0,
           isPaused: player.isPaused ? player.isPaused() : true
         };
-        console.log('[render] Saved YouTube state:', _savedYouTubeState);
+        console.log('[onStateChange] Saved YouTube state:', _savedYouTubeState);
       } else {
         _savedYouTubeState = null;
       }
       
       // Re-render if source OR hasEnteredTheater changed
-      if (newSource !== lastSource || newEnteredTheater !== lastEnteredTheater) {
+      if (sourceChanged || theaterChanged) {
+        console.log('[onStateChange] Triggering re-render due to:', sourceChanged ? 'source change' : 'theater change');
         lastSource = newSource;
         lastEnteredTheater = newEnteredTheater;
         render(); 
+      } else {
+        console.log('[onStateChange] Skipping re-render - participant change only');
       }
-      // Participant changes are handled by the UI reactively, no full re-render needed
     };
     
     roomManager.onChatMessage = (userId, displayName, message, timestamp, isMe) => {

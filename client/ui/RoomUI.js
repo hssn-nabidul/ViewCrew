@@ -89,6 +89,38 @@ export const RoomUI = {
           </aside>
         </main>
 
+        <!-- Mobile Chat Overlay (hidden by default, toggled via JS) -->
+        <div id="mobile-chat-overlay" class="lg:hidden hidden fixed inset-0 z-[60] flex flex-col bg-background/95 backdrop-blur-xl animate-slide-up" role="dialog" aria-label="Live chat">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-white/5">
+            <h2 class="text-sm font-bold uppercase tracking-widest text-on-surface">Live Chat</h2>
+            <button id="btnCloseMobileChat" class="touch-target flex items-center justify-center text-on-surface-variant hover:text-white rounded-lg p-2">
+              <span class="material-symbols-outlined">close</span>
+            </button>
+          </div>
+          <div id="mobile-chat-messages" class="flex-1 overflow-y-auto p-4 space-y-4">
+            ${RoomUI.chatMessages.map(msg => RoomUI.renderMessageHtml(msg, userId)).join('')}
+          </div>
+          <footer class="p-4 bg-surface border-t border-white/5">
+            <form class="flex items-center gap-2" onsubmit="return false;" role="form" aria-label="Send a message">
+              <input 
+                id="inputMobileChatMessage" 
+                class="flex-1 bg-background h-12 pl-4 pr-4 rounded-xl border border-white/5 focus:border-primary/50 focus:ring-2 focus:ring-primary/20 focus:outline-none transition-all text-on-surface placeholder:text-on-surface-variant/20 text-sm" 
+                placeholder="Message the crew..." 
+                type="text"
+                aria-label="Type a message"
+                autocomplete="off"
+              />
+              <button 
+                id="btnSendMobileChat" 
+                class="touch-target flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-on-primary shadow-hard shadow-primary/20 hover:scale-105 active:scale-95 transition-all"
+                aria-label="Send message"
+              >
+                <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">send</span>
+              </button>
+            </form>
+          </footer>
+        </div>
+
         <!-- Mobile Bottom Nav -->
         <nav class="lg:hidden flex justify-around items-center px-2 md:px-6 py-2 md:py-3 bg-surface/90 backdrop-blur-xl border-t border-white/5 z-50 pb-safe" role="navigation" aria-label="Bottom navigation">
           <button 
@@ -608,14 +640,64 @@ export const RoomUI = {
   },
 
   initListeners: (roomManager) => {
-    // Tab Switching - don't trigger onStateChange (re-render) for tab switches
-    // The UI handles tab switching internally without needing a full re-render
+    // Mobile Chat Overlay - show/hide without re-rendering
+    const mobileChatOverlay = document.querySelector('#mobile-chat-overlay');
+    const mobileChatMessages = document.querySelector('#mobile-chat-messages');
+    
+    const showMobileChat = () => {
+      if (mobileChatOverlay) {
+        mobileChatOverlay.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        // Scroll to bottom
+        if (mobileChatMessages) {
+          mobileChatMessages.scrollTop = mobileChatMessages.scrollHeight;
+        }
+      }
+    };
+    
+    const hideMobileChat = () => {
+      if (mobileChatOverlay) {
+        mobileChatOverlay.classList.add('hidden');
+        document.body.style.overflow = '';
+        RoomUI.currentTab = 'watch';
+      }
+    };
+    
+    // Mobile Chat Send Handler
+    const mobileChatInput = document.querySelector('#inputMobileChatMessage');
+    const mobileSendBtn = document.querySelector('#btnSendMobileChat');
+    if (mobileSendBtn && mobileChatInput) {
+      const sendMobileChat = () => {
+        const msg = mobileChatInput.value.trim();
+        if (msg) {
+          roomManager.sendChatMessage(msg);
+          mobileChatInput.value = '';
+        }
+      };
+      mobileSendBtn.onclick = sendMobileChat;
+      mobileChatInput.onkeydown = (e) => { if (e.key === 'Enter') sendMobileChat(); };
+    }
+    
+    // Close button for mobile chat
+    const btnCloseMobileChat = document.querySelector('#btnCloseMobileChat');
+    if (btnCloseMobileChat) {
+      btnCloseMobileChat.onclick = hideMobileChat;
+    }
+    
+    // Tab Switching - use overlay for mobile chat, no re-render needed
     document.querySelectorAll('[data-tab]').forEach(btn => {
       btn.onclick = () => {
         const tab = btn.getAttribute('data-tab');
         if (tab !== RoomUI.currentTab) {
           RoomUI.currentTab = tab;
-          // No onStateChange call here - tab switching doesn't need re-render
+          
+          // Mobile chat tab - show overlay instead of re-rendering
+          if (tab === 'chat') {
+            showMobileChat();
+          } else {
+            hideMobileChat();
+          }
+          // No onStateChange call - tab switching doesn't need re-render
         }
       };
     });
@@ -914,10 +996,19 @@ export const RoomUI = {
     RoomUI.chatMessages.push(msg);
     const preview = document.querySelector('#lastChatMessage');
     if (preview) preview.textContent = `${displayName}: "${message}"`;
+    
+    // Update desktop chat
     const container = document.querySelector('#chatMessages');
     if (container) {
       container.insertAdjacentHTML('beforeend', RoomUI.renderMessageHtml(msg, userId));
       container.scrollTop = container.scrollHeight;
+    }
+    
+    // Update mobile chat overlay
+    const mobileContainer = document.querySelector('#mobile-chat-messages');
+    if (mobileContainer) {
+      mobileContainer.insertAdjacentHTML('beforeend', RoomUI.renderMessageHtml(msg, userId));
+      mobileContainer.scrollTop = mobileContainer.scrollHeight;
     }
   },
 

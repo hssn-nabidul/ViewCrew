@@ -773,8 +773,10 @@ export const RoomUI = {
     }
 
     const btnSource = document.querySelector('#btnOpenSource');
+    console.log('[RoomUI] btnOpenSource exists:', !!btnSource, 'isHost:', roomManager.participants.find(p => p.userId === roomManager.userId || p.id === roomManager.userId)?.isHost);
     if (btnSource) {
       btnSource.onclick = () => {
+        console.log('[RoomUI] btnOpenSource clicked, setting currentTab to source');
         RoomUI.currentTab = 'source';
         if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
       };

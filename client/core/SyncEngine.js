@@ -78,10 +78,7 @@ export class SyncEngine {
     
     // Skip if we just applied pending source (player already created)
     if (this._justAppliedPending) {
-      if (this._playerInitDone) {
-        console.log('[SyncEngine] Skipping loadSource - pending source was just applied');
-        this._justAppliedPending = false;
-      }
+      console.log('[SyncEngine] Skipping loadSource - pending source was just applied, waiting for player init');
       return;
     }
     
@@ -376,6 +373,9 @@ export class SyncEngine {
       // The DOM is already correctly set up and re-rendering would destroy the iframe
       if (this._justAppliedPending) {
         console.log('[SyncEngine] Player ready, skipping onSourceLoaded (pending source was applied)');
+        
+        // Reset the flag since player is now ready
+        this._justAppliedPending = false;
         
         // But still handle pending time and playback state
         const pendingTime = this._pendingCurrentTime || 0;

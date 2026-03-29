@@ -96,11 +96,13 @@ const render = () => {
       const newSource = roomManager.syncEngine ? roomManager.syncEngine.currentSource : null;
       const newEnteredTheater = roomManager.hasEnteredTheater;
       
-      const sourceChanged = newSource !== lastSource;
+      // Use syncEngine.lastSource for comparison - this is updated when source is applied
+      const trackLastSource = roomManager.syncEngine ? roomManager.syncEngine.lastSource : lastSource;
+      const sourceChanged = newSource !== trackLastSource;
       const theaterChanged = newEnteredTheater !== lastEnteredTheater;
       
       console.log('[onStateChange] Called - source:', newSource, 'theater:', newEnteredTheater);
-      console.log('[onStateChange] sourceChanged:', sourceChanged, 'theaterChanged:', theaterChanged, 'lastSource:', lastSource, 'lastEnteredTheater:', lastEnteredTheater);
+      console.log('[onStateChange] sourceChanged:', sourceChanged, 'theaterChanged:', theaterChanged, 'trackLastSource:', trackLastSource, 'lastEnteredTheater:', lastEnteredTheater);
       console.log('[onStateChange] Participants:', participants?.length);
       
       // Skip if nothing actually changed (participant joins don't need re-render)

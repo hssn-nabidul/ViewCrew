@@ -14,6 +14,8 @@ export class SyncEngine {
     this.DRIFT_THRESHOLD = 3;
     this.SYNC_INTERVAL = 5000;
     this.onSourceLoaded = null;
+    this.onSourceApplied = null;
+    this.lastSource = null;
     this._pendingStream = null;
     this._pendingSource = null;
     this._isLoadingScreen = false;
@@ -337,6 +339,12 @@ export class SyncEngine {
     // (loadSource will see same source/value and return early)
     this.currentSource = source;
     this.currentSourceValue = value;
+    this.lastSource = source;
+    
+    // Notify listeners that source was applied
+    if (this.onSourceApplied) {
+      this.onSourceApplied(source, value);
+    }
     
     // Reset loading flags - we'll create a new player
     this._isLoadingSource = false;

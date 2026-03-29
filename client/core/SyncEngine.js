@@ -296,6 +296,13 @@ export class SyncEngine {
     
     const onEvent = (type, data) => this.onPlayerEvent(type, data);
     const onReady = () => {
+      // Don't trigger onSourceLoaded when we just applied pending source
+      // The DOM is already correctly set up and re-rendering would destroy the iframe
+      if (this._justAppliedPending) {
+        console.log('[SyncEngine] Player ready, skipping onSourceLoaded (pending source was applied)');
+        return;
+      }
+      
       // Debounce onSourceLoaded to prevent rapid re-renders
       if (this._sourceLoadedTimeout) {
         clearTimeout(this._sourceLoadedTimeout);

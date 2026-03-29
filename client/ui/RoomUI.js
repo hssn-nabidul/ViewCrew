@@ -902,7 +902,7 @@ export const RoomUI = {
         const name = document.querySelector('#inputSettingsDisplayName')?.value.trim();
         if (name) roomManager.updateDisplayName(name);
         RoomUI.currentTab = 'watch';
-        if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
+        render();
       };
     }
 
@@ -926,7 +926,7 @@ export const RoomUI = {
         }
         
         RoomUI.currentTab = 'watch';
-        if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
+        render();
       };
     }
 
@@ -963,7 +963,7 @@ export const RoomUI = {
           }
           
           // Trigger re-render BEFORE changeSource so container exists
-          if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
+          render();
           
           // Now change the source
           roomManager.syncEngine.changeSource('local', blobUrl, roomManager.roomId);
@@ -984,7 +984,7 @@ export const RoomUI = {
         } else {
           // Fallback state if not yet implemented in core
           roomManager.hasEnteredTheater = true;
-          if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
+          render();
         }
       };
     }

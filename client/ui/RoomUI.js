@@ -608,13 +608,14 @@ export const RoomUI = {
   },
 
   initListeners: (roomManager) => {
-    // Tab Switching
+    // Tab Switching - don't trigger onStateChange (re-render) for tab switches
+    // The UI handles tab switching internally without needing a full re-render
     document.querySelectorAll('[data-tab]').forEach(btn => {
       btn.onclick = () => {
         const tab = btn.getAttribute('data-tab');
         if (tab !== RoomUI.currentTab) {
           RoomUI.currentTab = tab;
-          if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
+          // No onStateChange call here - tab switching doesn't need re-render
         }
       };
     });

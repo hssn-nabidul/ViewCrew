@@ -144,7 +144,7 @@ const render = () => {
             const res = await fetch(`${API_URL}/api/rooms/${room}/join`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ participantName: finalName })
+              body: JSON.stringify({ participantName: finalName, participantId: userId })
             });
             const data = await res.json();
             

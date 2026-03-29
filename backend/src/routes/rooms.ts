@@ -180,7 +180,7 @@ router.get('/:id', (req: Request, res: Response) => {
 // POST /api/rooms/:id/join - Join a room
 router.post('/:id/join', (req: Request, res: Response) => {
   const { id } = req.params;
-  const { participantName } = req.body;
+  const { participantName, participantId: existingParticipantId } = req.body;
   
   if (!participantName || typeof participantName !== 'string' || participantName.trim().length === 0) {
     res.status(400).json({ error: 'VALIDATION_ERROR', message: 'participantName is required' });
@@ -192,6 +192,32 @@ router.post('/:id/join', (req: Request, res: Response) => {
   if (!room || !room.isActive) {
     res.status(404).json({ error: 'NOT_FOUND', message: 'Room not found' });
     return;
+  }
+  
+  // If participantId is provided, try to rejoin as existing participant
+  if (existingParticipantId && typeof existingParticipantId === 'string') {
+    const existingParticipant = room.participants.get(existingParticipantId);
+    if (existingParticipant) {
+      // Update display name if changed
+      existingParticipant.displayName = participantName.trim();
+      existingParticipant.socketId = '';
+      
+      const response: JoinRoomResponse = {
+        participantId: existingParticipantId,
+        roomInfo: {
+          id: room.id,
+          hostId: room.hostId,
+          participantCount: room.participants.size,
+          maxParticipants: MAX_PARTICIPANTS,
+          createdAt: room.createdAt,
+          isActive: room.isActive
+        }
+      };
+      
+      console.log(`[Room] ${participantName} re-joined room ${room.id} as existing participant`);
+      res.json(response);
+      return;
+    }
   }
   
   if (room.participants.size >= MAX_PARTICIPANTS) {

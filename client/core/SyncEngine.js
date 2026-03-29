@@ -19,6 +19,7 @@ export class SyncEngine {
     this._isLoadingScreen = false;
     this._sourceLoadedTimeout = null;
     this._isLoadingSource = false;
+    this._justAppliedPending = false;
 
     this.setupListeners();
   }
@@ -64,6 +65,13 @@ export class SyncEngine {
     // Prevent re-entrant calls
     if (this._isLoadingSource) {
       console.log('[SyncEngine] Already loading source, skipping');
+      return;
+    }
+    
+    // Skip if we just applied pending source (player already created)
+    if (this._justAppliedPending) {
+      console.log('[SyncEngine] Skipping loadSource - pending source was just applied');
+      this._justAppliedPending = false;
       return;
     }
     
@@ -259,6 +267,7 @@ export class SyncEngine {
     // Reset loading flags - we'll create a new player
     this._isLoadingSource = false;
     this._isLoadingScreen = false;
+    this._justAppliedPending = true;
     
     const container = document.getElementById(this.containerId);
     if (!container) {
@@ -360,6 +369,7 @@ export class SyncEngine {
     this._pendingStream = null;
     this._isLoadingSource = false;
     this._isLoadingScreen = false;
+    this._justAppliedPending = false;
     
     console.log('[SyncEngine] Cleanup complete');
   }

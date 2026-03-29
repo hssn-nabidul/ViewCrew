@@ -37,24 +37,7 @@ const render = () => {
     const hasEnteredTheater = roomManager.hasEnteredTheater;
     
     console.log('[render] Rendering, hasEnteredTheater:', hasEnteredTheater, 'currentSource:', currentSource);
-    
-    // Save video container content before re-rendering to preserve iframe
-    const existingContainer = document.getElementById('video-container');
-    const savedContainerContent = existingContainer ? existingContainer.innerHTML : null;
-    
     app.innerHTML = RoomUI.render(roomId, roomManager.participants, userId, currentSource, currentSourceValue, hasEnteredTheater);
-    
-    // Restore video container content if it was saved and source is playing
-    if (savedContainerContent && existingContainer) {
-      const newContainer = document.getElementById('video-container');
-      if (newContainer && currentSource && currentSource !== 'screen') {
-        // Only restore if container is empty (iframe was destroyed)
-        if (!newContainer.querySelector('iframe')) {
-          console.log('[render] Restoring saved video container content');
-          newContainer.innerHTML = savedContainerContent;
-        }
-      }
-    }
     
     const container = document.getElementById('video-container');
     const lobbyView = document.querySelector('[data-lobby]');

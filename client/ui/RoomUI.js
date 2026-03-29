@@ -42,7 +42,9 @@ export const RoomUI = {
     }
 
     const isLobby = !currentSource;
-    const isHost = participants.find(p => p.userId === userId || p.id === userId)?.isHost;
+    const myParticipant = participants.find(p => p.userId === userId || p.id === userId);
+    const isHost = myParticipant?.isHost;
+    console.log('[RoomUI.render] userId:', userId, 'participants:', participants.map(p => ({userId: p.userId, isHost: p.isHost})), 'myParticipant:', myParticipant, 'isHost:', isHost);
 
     let activeView = RoomUI.currentTab;
     if (isLobby && activeView === 'watch') activeView = 'lobby';

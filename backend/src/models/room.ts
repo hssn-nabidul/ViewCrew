@@ -21,6 +21,7 @@ export interface Room {
   currentSource?: string;
   currentSourceValue?: string;
   currentTime: number;
+  isPlaying: boolean;
 }
 
 // Room creation response

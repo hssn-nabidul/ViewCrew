@@ -74,6 +74,7 @@ export function setupSocketHandlers(io: Server): void {
           currentSource: room.currentSource,
           currentSourceValue: room.currentSourceValue,
           currentTime: room.currentTime,
+          isPlaying: room.isPlaying,
           participants: Array.from(room.participants.values()).map(p => ({
             userId: p.id,
             displayName: p.displayName,
@@ -142,8 +143,15 @@ export function setupSocketHandlers(io: Server): void {
         room.currentSource = payload.source;
         room.currentSourceValue = payload.sourceValue;
         room.currentTime = 0;
+        room.isPlaying = false;
       } else if (payload.time !== undefined) {
         room.currentTime = payload.time;
+      }
+      
+      if (payload.type === 'play') {
+        room.isPlaying = true;
+      } else if (payload.type === 'pause') {
+        room.isPlaying = false;
       }
 
       socket.to(normalizedRoomId).emit('sync-event', payload);

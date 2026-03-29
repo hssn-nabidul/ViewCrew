@@ -95,7 +95,7 @@ export class RoomManager {
       }
 
       if (state.isScreenSharing && state.screenSharingUserId !== this.userId) {
-        this.syncEngine.loadSource('screen', state.screenSharingUserId, state.currentTime);
+        this.syncEngine.loadSource('screen', state.screenSharingUserId, state.currentTime, state.isPlaying);
         // Request screen stream from host since we're a late joiner
         setTimeout(() => {
           console.log('[RoomManager] Requesting screen stream from host');
@@ -104,7 +104,7 @@ export class RoomManager {
       }
 
       if (state.currentSource && state.currentSource !== 'local' && state.currentSource !== 'screen') {
-        this.syncEngine.loadSource(state.currentSource, state.currentSourceValue, state.currentTime);
+        this.syncEngine.loadSource(state.currentSource, state.currentSourceValue, state.currentTime, state.isPlaying);
       }
 
       if (this._pendingScreenStream) {

@@ -21,6 +21,7 @@ export class SyncEngine {
     this._isLoadingSource = false;
     this._justAppliedPending = false;
     this._playerInitDone = false;
+    this._pendingIsPlaying = false;
 
     this.setupListeners();
   }
@@ -62,15 +63,16 @@ export class SyncEngine {
     }
   }
 
-  loadSource(source, value, currentTime = 0) {
+  loadSource(source, value, currentTime = 0, isPlaying = false) {
     // Prevent re-entrant calls
     if (this._isLoadingSource) {
       console.log('[SyncEngine] Already loading source, skipping');
       return;
     }
     
-    // Store the currentTime for later use when player is ready
+    // Store the currentTime and playback state for later use when player is ready
     this._pendingCurrentTime = currentTime;
+    this._pendingIsPlaying = isPlaying;
     
     // Skip if we just applied pending source (player already created)
     if (this._justAppliedPending) {
@@ -154,11 +156,23 @@ export class SyncEngine {
       
       // Seek to the current playback position for late joiners
       const pendingTime = this._pendingCurrentTime || 0;
+      const shouldPlay = this._pendingIsPlaying;
+      
       if (pendingTime > 0 && this.player) {
         console.log('[SyncEngine] Seeking to current playback position:', pendingTime);
         this.player.seek(pendingTime);
       }
+      
+      // Start playback if video was playing when late joiner joined
+      if (shouldPlay && this.player) {
+        console.log('[SyncEngine] Resuming playback for late joiner');
+        setTimeout(() => {
+          if (this.player) this.player.play();
+        }, 200);
+      }
+      
       this._pendingCurrentTime = 0;
+      this._pendingIsPlaying = false;
       
       console.log('[SyncEngine] Player ready, triggering onSourceLoaded');
       // Debounce onSourceLoaded to prevent rapid re-renders
@@ -358,6 +372,25 @@ export class SyncEngine {
       // The DOM is already correctly set up and re-rendering would destroy the iframe
       if (this._justAppliedPending) {
         console.log('[SyncEngine] Player ready, skipping onSourceLoaded (pending source was applied)');
+        
+        // But still handle pending time and playback state
+        const pendingTime = this._pendingCurrentTime || 0;
+        const shouldPlay = this._pendingIsPlaying;
+        
+        if (pendingTime > 0 && this.player) {
+          console.log('[SyncEngine] Seeking to pending playback position:', pendingTime);
+          this.player.seek(pendingTime);
+        }
+        
+        if (shouldPlay && this.player) {
+          console.log('[SyncEngine] Resuming playback for late joiner');
+          setTimeout(() => {
+            if (this.player) this.player.play();
+          }, 200);
+        }
+        
+        this._pendingCurrentTime = 0;
+        this._pendingIsPlaying = false;
         return;
       }
       
@@ -441,6 +474,7 @@ export class SyncEngine {
     this._isLoadingScreen = false;
     this._justAppliedPending = false;
     this._playerInitDone = false;
+    this._pendingIsPlaying = false;
     
     console.log('[SyncEngine] Cleanup complete');
   }

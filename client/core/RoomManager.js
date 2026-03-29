@@ -209,9 +209,10 @@ export class RoomManager {
 
   setupSyncEngineCallbacks() {
     this.syncEngine.onSourceLoaded = (source, value) => {
-      if (this.onStateChange) this.onStateChange(this.participants);
-
+      // Viewers should not trigger re-render when their source loads - only the host should
       if (!this.syncEngine.isHost) return;
+
+      if (this.onStateChange) this.onStateChange(this.participants);
 
       if (source === 'local') {
         this.syncEngine._hasCaptured = false;

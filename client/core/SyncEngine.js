@@ -76,7 +76,7 @@ export class SyncEngine {
     }
     
     // If same source and player already exists, skip (player is already created)
-    if (this.currentSource === source && this.player && this.currentSourceValue === value) {
+    if (this.currentSource === source && this.currentSourceValue === value && this.player) {
       console.log('[SyncEngine] Player already exists for this source, skipping');
       console.log('[SyncEngine]   currentSource:', this.currentSource, 'source:', source);
       console.log('[SyncEngine]   currentSourceValue:', this.currentSourceValue, 'value:', value);

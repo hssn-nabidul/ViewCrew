@@ -75,6 +75,26 @@ export class SyncEngine {
       return;
     }
     
+    // If same source and player already exists, skip (player is already created)
+    if (this.currentSource === source && this.player && this.currentSourceValue === value) {
+      console.log('[SyncEngine] Player already exists for this source, skipping');
+      console.log('[SyncEngine]   currentSource:', this.currentSource, 'source:', source);
+      console.log('[SyncEngine]   currentSourceValue:', this.currentSourceValue, 'value:', value);
+      console.log('[SyncEngine]   player exists:', !!this.player);
+      this._isLoadingSource = false;
+      return;
+    }
+    
+    console.log('[SyncEngine] loadSource check failed:', {
+      sameSource: this.currentSource === source,
+      playerExists: !!this.player,
+      sameValue: this.currentSourceValue === value,
+      currentSource: this.currentSource,
+      source: source,
+      currentValue: this.currentSourceValue,
+      value: value
+    });
+    
     console.log('[SyncEngine] Loading source:', source, value ? '(value provided)' : '(no value)');
     this._isLoadingSource = true;
 

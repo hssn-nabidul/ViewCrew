@@ -18,6 +18,8 @@ const roomManager = new RoomManager(API_URL, userId, displayName);
 // Track cleanup for event listeners
 let cleanupRender = null;
 let lastSource = null;
+let lastEnteredTheater = false;
+let _initializedState = false;
 
 // Save YouTube player state before re-render
 let _savedYouTubeState = null;
@@ -31,6 +33,10 @@ const cleanup = () => {
     roomManager.syncEngine.cleanup();
   }
   roomManager.destroy();
+  _initializedState = false;
+  lastSource = null;
+  lastEnteredTheater = false;
+  _savedYouTubeState = null;
 };
 
 const render = () => {
@@ -79,8 +85,14 @@ const render = () => {
       }
     }
     
-    lastSource = currentSource;
-    let lastEnteredTheater = currentSource ? roomManager.hasEnteredTheater : false;
+    // Initialize state tracking on first render
+    if (!_initializedState) {
+      lastSource = currentSource;
+      lastEnteredTheater = currentSource ? roomManager.hasEnteredTheater : false;
+      _initializedState = true;
+      console.log('[render] Initialized state tracking - lastSource:', lastSource, 'lastEnteredTheater:', lastEnteredTheater);
+    }
+    
     roomManager.onStateChange = (participants) => {
       const newSource = roomManager.syncEngine ? roomManager.syncEngine.currentSource : null;
       const newEnteredTheater = roomManager.hasEnteredTheater;
@@ -89,8 +101,14 @@ const render = () => {
       const theaterChanged = newEnteredTheater !== lastEnteredTheater;
       
       console.log('[onStateChange] Called - source:', newSource, 'theater:', newEnteredTheater);
-      console.log('[onStateChange] sourceChanged:', sourceChanged, 'theaterChanged:', theaterChanged);
+      console.log('[onStateChange] sourceChanged:', sourceChanged, 'theaterChanged:', theaterChanged, 'lastSource:', lastSource, 'lastEnteredTheater:', lastEnteredTheater);
       console.log('[onStateChange] Participants:', participants?.length);
+      
+      // Skip if nothing actually changed
+      if (!sourceChanged && !theaterChanged) {
+        console.log('[onStateChange] Skipping re-render - no changes');
+        return;
+      }
       
       // Save YouTube player state before re-render
       if (newSource === 'youtube' && roomManager.syncEngine && roomManager.syncEngine.player) {

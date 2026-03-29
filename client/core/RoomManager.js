@@ -96,6 +96,11 @@ export class RoomManager {
 
       if (state.isScreenSharing && state.screenSharingUserId !== this.userId) {
         this.syncEngine.loadSource('screen', state.screenSharingUserId, state.currentTime);
+        // Request screen stream from host since we're a late joiner
+        setTimeout(() => {
+          console.log('[RoomManager] Requesting screen stream from host');
+          this.socket.emit('request-screen', { roomId: state.roomId });
+        }, 500);
       }
 
       if (state.currentSource && state.currentSource !== 'local' && state.currentSource !== 'screen') {
@@ -135,6 +140,15 @@ export class RoomManager {
       this.peerManager.removeCallReference(leftUserId, 'screen');
 
       if (this.onStateChange) this.onStateChange(this.participants);
+    });
+
+    // screen-requested: Late joiner requesting screen stream from host
+    this.socket.on('screen-requested', ({ requesterId, requesterName }) => {
+      console.log(`[RoomManager] ${requesterName} (${requesterId}) requested screen stream`);
+      if (this.screenShare.isActive() && this.peerManager.screenStream) {
+        console.log('[RoomManager] Sending screen stream to requester');
+        this.peerManager.callPeer(requesterId, 'screen');
+      }
     });
 
     this.socket.on('chat-message', (data) => {

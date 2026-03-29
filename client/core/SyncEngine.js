@@ -199,9 +199,11 @@ export class SyncEngine {
         console.log('[SyncEngine] Applying buffered pending stream to new ScreenPlayer');
         this.player.load(this._pendingStream);
         this._pendingStream = null;
+        onReady();
+      } else {
+        console.log('[SyncEngine] ScreenPlayer created, waiting for stream...');
+        this._screenPlayerReady = onReady;
       }
-      onReady();
-      // Reset loading flag after stream is attached
       this._isLoadingScreen = false;
     }
     
@@ -290,6 +292,12 @@ export class SyncEngine {
           console.log('[SyncEngine] Calling player.play after stream attach');
           if (this.player) this.player.play();
         }, 300);
+      }
+      
+      if (this._screenPlayerReady) {
+        console.log('[SyncEngine] Calling _screenPlayerReady after stream attach');
+        this._screenPlayerReady();
+        this._screenPlayerReady = null;
       }
     } else {
       console.warn('[SyncEngine] ScreenPlayer not ready, buffering stream');

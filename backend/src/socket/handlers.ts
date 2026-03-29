@@ -149,6 +149,24 @@ export function setupSocketHandlers(io: Server): void {
       socket.to(normalizedRoomId).emit('sync-event', payload);
     });
 
+    // request-screen: Late joiner requests screen stream from host
+    socket.on('request-screen', (data: { roomId: string }) => {
+      const normalizedRoomId = (data.roomId || socketData.roomId)?.toUpperCase();
+      if (!normalizedRoomId) return;
+      
+      const room = getRoom(normalizedRoomId);
+      if (!room || !room.isScreenSharing) return;
+      
+      // Notify the host that someone wants their screen
+      const hostSocketId = room.participants.get(room.hostId)?.socketId;
+      if (hostSocketId) {
+        io.to(hostSocketId).emit('screen-requested', {
+          requesterId: socketData.userId,
+          requesterName: socketData.displayName
+        });
+      }
+    });
+
     socket.on('update-display-name', (data: { roomId: string; userId: string; displayName: string }) => {
       const { roomId, userId, displayName } = data;
       const normalizedRoomId = roomId.toUpperCase();

@@ -20,6 +20,7 @@ export class SyncEngine {
     this._sourceLoadedTimeout = null;
     this._isLoadingSource = false;
     this._justAppliedPending = false;
+    this._playerInitDone = false;
 
     this.setupListeners();
   }
@@ -70,8 +71,10 @@ export class SyncEngine {
     
     // Skip if we just applied pending source (player already created)
     if (this._justAppliedPending) {
-      console.log('[SyncEngine] Skipping loadSource - pending source was just applied');
-      this._justAppliedPending = false;
+      if (this._playerInitDone) {
+        console.log('[SyncEngine] Skipping loadSource - pending source was just applied');
+        this._justAppliedPending = false;
+      }
       return;
     }
     
@@ -144,6 +147,7 @@ export class SyncEngine {
 
     const onEvent = (type, data) => this.onPlayerEvent(type, data);
     const onReady = () => {
+      this._playerInitDone = true;
       console.log('[SyncEngine] Player ready, triggering onSourceLoaded');
       // Debounce onSourceLoaded to prevent rapid re-renders
       if (this._sourceLoadedTimeout) {
@@ -328,6 +332,8 @@ export class SyncEngine {
     
     const onEvent = (type, data) => this.onPlayerEvent(type, data);
     const onReady = () => {
+      this._playerInitDone = true;
+      
       // Don't trigger onSourceLoaded when we just applied pending source
       // The DOM is already correctly set up and re-rendering would destroy the iframe
       if (this._justAppliedPending) {
@@ -414,6 +420,7 @@ export class SyncEngine {
     this._isLoadingSource = false;
     this._isLoadingScreen = false;
     this._justAppliedPending = false;
+    this._playerInitDone = false;
     
     console.log('[SyncEngine] Cleanup complete');
   }

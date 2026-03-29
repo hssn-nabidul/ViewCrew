@@ -684,20 +684,29 @@ export const RoomUI = {
       btnCloseMobileChat.onclick = hideMobileChat;
     }
     
-    // Tab Switching - use overlay for mobile chat, no re-render needed
+    // Tab Switching - desktop needs re-render, mobile uses overlay
     document.querySelectorAll('[data-tab]').forEach(btn => {
       btn.onclick = () => {
         const tab = btn.getAttribute('data-tab');
         if (tab !== RoomUI.currentTab) {
           RoomUI.currentTab = tab;
           
-          // Mobile chat tab - show overlay instead of re-rendering
-          if (tab === 'chat') {
-            showMobileChat();
+          // Mobile chat/people tabs - show overlay instead of re-rendering
+          if (tab === 'chat' || tab === 'people') {
+            const isMobile = window.innerWidth < 1024; // lg breakpoint
+            if (isMobile) {
+              if (tab === 'chat') {
+                showMobileChat();
+              }
+              // People tab on mobile - no overlay needed, just switch tab
+              return;
+            }
           } else {
             hideMobileChat();
           }
-          // No onStateChange call - tab switching doesn't need re-render
+          
+          // Trigger re-render for desktop tabs or non-chat mobile tabs
+          if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
         }
       };
     });

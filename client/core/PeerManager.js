@@ -216,7 +216,6 @@ export class PeerManager {
     // Don't stop tracks - keep stream cached for late joiners
     this.screenStream = null;
   }
-  }
 
   destroy() {
     this.calls.forEach(calls => {

@@ -781,8 +781,13 @@ export const RoomUI = {
           roomManager.hasEnteredTheater = true;
         }
         
+        // Buffer the source BEFORE switching tabs so tryApplyPendingSource can find it after re-render
+        if (roomManager.syncEngine) {
+          roomManager.syncEngine._pendingSource = { source, value: val };
+        }
+        
         RoomUI.currentTab = 'watch';
-        roomManager.syncEngine.changeSource(source, val, roomManager.roomId);
+        if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
       };
     }
 

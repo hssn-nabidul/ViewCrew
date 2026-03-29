@@ -264,11 +264,6 @@ export class SyncEngine {
   tryApplyPendingSource() {
     if (!this._pendingSource) return;
     
-    // Reset loading flags - we'll create a new player
-    this._isLoadingSource = false;
-    this._isLoadingScreen = false;
-    this._justAppliedPending = true;
-    
     const container = document.getElementById(this.containerId);
     if (!container) {
       console.log('[SyncEngine] Container still not ready for pending source');
@@ -279,6 +274,16 @@ export class SyncEngine {
     const { source, value } = this._pendingSource;
     this._pendingSource = null;
     
+    // Set currentSource immediately so subsequent render won't call loadSource again
+    // (loadSource will see same source/value and return early)
+    this.currentSource = source;
+    this.currentSourceValue = value;
+    
+    // Reset loading flags - we'll create a new player
+    this._isLoadingSource = false;
+    this._isLoadingScreen = false;
+    this._justAppliedPending = true;
+    
     console.log('[SyncEngine] Container found, creating player for:', source);
     
     if (this.player) {
@@ -286,8 +291,8 @@ export class SyncEngine {
       this.player = null;
     }
     
-    this.currentSource = source;
-    this.currentSourceValue = value;
+    // Don't set currentSource here - let onSourceLoaded set it after player is ready
+    // This prevents an extra render from destroying the iframe before YouTube initializes
     
     const onEvent = (type, data) => this.onPlayerEvent(type, data);
     const onReady = () => {

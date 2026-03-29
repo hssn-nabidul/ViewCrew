@@ -64,6 +64,11 @@ const render = () => {
       roomManager.syncEngine.tryApplyPendingSource();
     }
     
+    // Update lastSource to match current source (handles case where source was applied via _pendingSource)
+    if (roomManager.syncEngine && roomManager.syncEngine.currentSource) {
+      lastSource = roomManager.syncEngine.currentSource;
+    }
+    
     // Re-attach player if it already existed (handles full re-renders)
     if (currentSource && roomManager.syncEngine) {
       roomManager.syncEngine.loadSource(currentSource, currentSourceValue);

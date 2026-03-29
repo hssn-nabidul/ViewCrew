@@ -95,11 +95,11 @@ export class RoomManager {
       }
 
       if (state.isScreenSharing && state.screenSharingUserId !== this.userId) {
-        this.syncEngine.loadSource('screen', state.screenSharingUserId);
+        this.syncEngine.loadSource('screen', state.screenSharingUserId, state.currentTime);
       }
 
       if (state.currentSource && state.currentSource !== 'local' && state.currentSource !== 'screen') {
-        this.syncEngine.loadSource(state.currentSource, state.currentSourceValue);
+        this.syncEngine.loadSource(state.currentSource, state.currentSourceValue, state.currentTime);
       }
 
       if (this._pendingScreenStream) {

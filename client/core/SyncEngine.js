@@ -62,12 +62,15 @@ export class SyncEngine {
     }
   }
 
-  loadSource(source, value) {
+  loadSource(source, value, currentTime = 0) {
     // Prevent re-entrant calls
     if (this._isLoadingSource) {
       console.log('[SyncEngine] Already loading source, skipping');
       return;
     }
+    
+    // Store the currentTime for later use when player is ready
+    this._pendingCurrentTime = currentTime;
     
     // Skip if we just applied pending source (player already created)
     if (this._justAppliedPending) {
@@ -148,6 +151,15 @@ export class SyncEngine {
     const onEvent = (type, data) => this.onPlayerEvent(type, data);
     const onReady = () => {
       this._playerInitDone = true;
+      
+      // Seek to the current playback position for late joiners
+      const pendingTime = this._pendingCurrentTime || 0;
+      if (pendingTime > 0 && this.player) {
+        console.log('[SyncEngine] Seeking to current playback position:', pendingTime);
+        this.player.seek(pendingTime);
+      }
+      this._pendingCurrentTime = 0;
+      
       console.log('[SyncEngine] Player ready, triggering onSourceLoaded');
       // Debounce onSourceLoaded to prevent rapid re-renders
       if (this._sourceLoadedTimeout) {

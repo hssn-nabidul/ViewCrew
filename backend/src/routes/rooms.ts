@@ -135,7 +135,8 @@ router.post('/', async (req: Request, res: Response) => {
       createdAt: new Date(),
       isActive: true,
       isScreenSharing: false,
-      destroyTimer: null
+      destroyTimer: null,
+      currentTime: 0
     };
     
     rooms.set(roomId, room);

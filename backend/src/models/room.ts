@@ -20,6 +20,7 @@ export interface Room {
   destroyTimer?: NodeJS.Timeout | null;
   currentSource?: string;
   currentSourceValue?: string;
+  currentTime: number;
 }
 
 // Room creation response

@@ -118,7 +118,7 @@ export class YouTubePlayer extends PlayerInterface {
   isPaused() { 
     if (!this.player || typeof this.player.getPlayerState !== 'function') return true;
     const state = this.player.getPlayerState();
-    return state === window.YT.PlayerState.PAUSED || state === window.YT.PlayerState.UNSTARTED || state === window.YT.PlayerState.ENDED;
+    return state !== window.YT.PlayerState.PLAYING && state !== window.YT.PlayerState.BUFFERING;
   }
   setVolume(volume) { 
     if (this.player && typeof this.player.setVolume === 'function') {

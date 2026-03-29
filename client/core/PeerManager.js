@@ -43,6 +43,7 @@ export class PeerManager {
     });
 
     this.screenStream = null;
+    this._cachedScreenStream = null;
     this.calls = new Map();
     this.onRemoteStream = null;
     this.onRemoteStreamRemoved = null;
@@ -198,6 +199,7 @@ export class PeerManager {
     }
 
     this.screenStream = stream;
+    this._cachedScreenStream = stream;
     remoteUserIds.forEach(id => {
       if (id !== this.userId) {
         this.callPeer(id, 'screen');
@@ -211,10 +213,9 @@ export class PeerManager {
         calls.screen.close();
       }
     });
-    if (this.screenStream) {
-      this.screenStream.getTracks().forEach(t => t.stop());
-      this.screenStream = null;
-    }
+    // Don't stop tracks - keep stream cached for late joiners
+    this.screenStream = null;
+  }
   }
 
   destroy() {

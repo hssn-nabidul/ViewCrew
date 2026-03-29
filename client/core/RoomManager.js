@@ -145,9 +145,12 @@ export class RoomManager {
     // screen-requested: Late joiner requesting screen stream from host
     this.socket.on('screen-requested', ({ requesterId, requesterName }) => {
       console.log(`[RoomManager] ${requesterName} (${requesterId}) requested screen stream`);
-      if (this.screenShare.isActive() && this.peerManager.screenStream) {
-        console.log('[RoomManager] Sending screen stream to requester');
+      const cachedStream = this.peerManager._cachedScreenStream;
+      if (cachedStream) {
+        console.log('[RoomManager] Sending cached screen stream to requester');
         this.peerManager.callPeer(requesterId, 'screen');
+      } else {
+        console.log('[RoomManager] No cached screen stream available');
       }
     });
 

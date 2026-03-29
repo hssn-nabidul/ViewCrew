@@ -18,6 +18,8 @@ export interface Room {
   isScreenSharing: boolean;
   screenSharingUserId?: string;
   destroyTimer?: NodeJS.Timeout | null;
+  currentSource?: string;
+  currentSourceValue?: string;
 }
 
 // Room creation response

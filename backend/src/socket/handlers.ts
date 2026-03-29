@@ -71,6 +71,8 @@ export function setupSocketHandlers(io: Server): void {
           hostId: room.hostId,
           isScreenSharing: room.isScreenSharing,
           screenSharingUserId: room.screenSharingUserId,
+          currentSource: room.currentSource,
+          currentSourceValue: room.currentSourceValue,
           participants: Array.from(room.participants.values()).map(p => ({
             userId: p.id,
             displayName: p.displayName,
@@ -136,6 +138,8 @@ export function setupSocketHandlers(io: Server): void {
       if (payload.type === 'source-change') {
         room.isScreenSharing = payload.source === 'screen';
         room.screenSharingUserId = room.isScreenSharing ? payload.sourceValue : undefined;
+        room.currentSource = payload.source;
+        room.currentSourceValue = payload.sourceValue;
       }
 
       socket.to(normalizedRoomId).emit('sync-event', payload);

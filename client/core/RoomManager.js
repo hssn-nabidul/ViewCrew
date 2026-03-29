@@ -98,6 +98,10 @@ export class RoomManager {
         this.syncEngine.loadSource('screen', state.screenSharingUserId);
       }
 
+      if (state.currentSource && state.currentSource !== 'local' && state.currentSource !== 'screen') {
+        this.syncEngine.loadSource(state.currentSource, state.currentSourceValue);
+      }
+
       if (this._pendingScreenStream) {
         console.log('[RoomManager] Flushing buffered screen stream to SyncEngine');
         this.syncEngine.attachScreenStream(this._pendingScreenStream);

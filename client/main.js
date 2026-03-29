@@ -19,6 +19,9 @@ const roomManager = new RoomManager(API_URL, userId, displayName);
 let cleanupRender = null;
 let lastSource = null;
 
+// Save YouTube player state before re-render
+let _savedYouTubeState = null;
+
 const cleanup = () => {
   if (cleanupRender) {
     cleanupRender();
@@ -32,6 +35,19 @@ const cleanup = () => {
 
 const render = () => {
   if (roomId) {
+    // Save YouTube player state before re-render
+    if (roomManager.syncEngine && roomManager.syncEngine.currentSource === 'youtube' && roomManager.syncEngine.player) {
+      const player = roomManager.syncEngine.player;
+      _savedYouTubeState = {
+        videoId: roomManager.syncEngine.currentSourceValue,
+        currentTime: player.getCurrentTime ? player.getCurrentTime() : 0,
+        isPaused: player.isPaused ? player.isPaused() : true
+      };
+      console.log('[render] Saved YouTube state:', _savedYouTubeState);
+    } else {
+      _savedYouTubeState = null;
+    }
+
     const currentSource = roomManager.syncEngine ? roomManager.syncEngine.currentSource : null;
     const currentSourceValue = roomManager.syncEngine ? roomManager.syncEngine.currentSourceValue : null;
     const hasEnteredTheater = roomManager.hasEnteredTheater;
@@ -58,6 +74,20 @@ const render = () => {
     // Re-attach player if it already existed (handles full re-renders)
     if (currentSource && roomManager.syncEngine) {
       roomManager.syncEngine.loadSource(currentSource, currentSourceValue);
+      
+      // If we had saved YouTube state, restore playback position
+      if (currentSource === 'youtube' && _savedYouTubeState && _savedYouTubeState.currentTime > 0) {
+        const player = roomManager.syncEngine.player;
+        if (player && player.seek) {
+          setTimeout(() => {
+            player.seek(_savedYouTubeState.currentTime);
+            if (!_savedYouTubeState.isPaused && player.play) {
+              player.play();
+            }
+            _savedYouTubeState = null;
+          }, 500);
+        }
+      }
     }
     
     lastSource = currentSource;

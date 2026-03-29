@@ -5,6 +5,37 @@ export const RoomUI = {
   seekAnimationFrame: null,
   chatMessages: [],
 
+  switchSidebarTab: (tab, userId, participants) => {
+    // Update tab button states
+    document.querySelectorAll('[data-tab]').forEach(btn => {
+      const btnTab = btn.getAttribute('data-tab');
+      if (btnTab === tab) {
+        btn.classList.add('text-primary', 'border-b-2', 'border-primary', 'bg-primary/5');
+        btn.classList.remove('text-on-surface-variant', 'hover:text-on-surface', 'hover:bg-white/5');
+        btn.setAttribute('aria-selected', 'true');
+      } else {
+        btn.classList.remove('text-primary', 'border-b-2', 'border-primary', 'bg-primary/5');
+        btn.classList.add('text-on-surface-variant', 'hover:text-on-surface', 'hover:bg-white/5');
+        btn.setAttribute('aria-selected', 'false');
+      }
+    });
+    
+    // Update the sidebar panel content
+    const panel = document.getElementById('chat-panel') || document.getElementById('people-panel');
+    if (panel) {
+      if (tab === 'chat') {
+        panel.id = 'chat-panel';
+        panel.innerHTML = RoomUI.renderChatView(participants, userId);
+      } else if (tab === 'people') {
+        panel.id = 'people-panel';
+        panel.innerHTML = RoomUI.renderPeopleView(participants, userId);
+      }
+    }
+    
+    RoomUI.currentTab = tab;
+    RoomUI.sidebarTab = tab;
+  },
+
   render: (roomId, participants, userId, currentSource, currentSourceValue, hasEnteredTheater) => {
     if (!hasEnteredTheater) {
       return RoomUI.renderLobbyView(participants, userId, roomId);
@@ -684,28 +715,40 @@ export const RoomUI = {
       btnCloseMobileChat.onclick = hideMobileChat;
     }
     
-    // Tab Switching - desktop needs re-render, mobile uses overlay
+    // Tab Switching - desktop updates sidebar without re-render, mobile uses overlay
     document.querySelectorAll('[data-tab]').forEach(btn => {
       btn.onclick = () => {
         const tab = btn.getAttribute('data-tab');
         if (tab !== RoomUI.currentTab) {
-          RoomUI.currentTab = tab;
+          const isMobile = window.innerWidth < 1024; // lg breakpoint
           
           // Mobile chat/people tabs - show overlay instead of re-rendering
           if (tab === 'chat' || tab === 'people') {
-            const isMobile = window.innerWidth < 1024; // lg breakpoint
             if (isMobile) {
               if (tab === 'chat') {
                 showMobileChat();
               }
               // People tab on mobile - no overlay needed, just switch tab
               return;
+            } else {
+              // Desktop: update sidebar without re-render
+              hideMobileChat();
+              RoomUI.switchSidebarTab(tab, roomManager.userId, roomManager.participants);
+              // Re-attach chat listeners for desktop
+              const btnSend = document.querySelector('#btnSendChat');
+              const inputChat = document.querySelector('#inputChatMessage');
+              if (btnSend && inputChat) {
+                const send = () => { const m = inputChat.value.trim(); if (m) { roomManager.sendChatMessage(m); inputChat.value = ''; } };
+                btnSend.onclick = send;
+                inputChat.onkeydown = (e) => { if (e.key === 'Enter') send(); };
+              }
+              return;
             }
           } else {
             hideMobileChat();
           }
           
-          // Trigger re-render for desktop tabs or non-chat mobile tabs
+          // Trigger re-render for settings/source tabs or non-chat mobile tabs
           if (roomManager.onStateChange) roomManager.onStateChange(roomManager.participants);
         }
       };

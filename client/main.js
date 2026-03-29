@@ -35,24 +35,13 @@ const cleanup = () => {
 
 const render = () => {
   if (roomId) {
-    // Save YouTube player state before re-render
-    if (roomManager.syncEngine && roomManager.syncEngine.currentSource === 'youtube' && roomManager.syncEngine.player) {
-      const player = roomManager.syncEngine.player;
-      _savedYouTubeState = {
-        videoId: roomManager.syncEngine.currentSourceValue,
-        currentTime: player.getCurrentTime ? player.getCurrentTime() : 0,
-        isPaused: player.isPaused ? player.isPaused() : true
-      };
-      console.log('[render] Saved YouTube state:', _savedYouTubeState);
-    } else {
-      _savedYouTubeState = null;
-    }
-
     const currentSource = roomManager.syncEngine ? roomManager.syncEngine.currentSource : null;
     const currentSourceValue = roomManager.syncEngine ? roomManager.syncEngine.currentSourceValue : null;
     const hasEnteredTheater = roomManager.hasEnteredTheater;
     
     console.log('[render] Rendering, hasEnteredTheater:', hasEnteredTheater, 'currentSource:', currentSource);
+    
+    // Render the new HTML
     app.innerHTML = RoomUI.render(roomId, roomManager.participants, userId, currentSource, currentSourceValue, hasEnteredTheater);
     
     const container = document.getElementById('video-container');
@@ -95,6 +84,19 @@ const render = () => {
     roomManager.onStateChange = (participants) => {
       const newSource = roomManager.syncEngine ? roomManager.syncEngine.currentSource : null;
       const newEnteredTheater = roomManager.hasEnteredTheater;
+      
+      // Save YouTube player state before re-render
+      if (newSource === 'youtube' && roomManager.syncEngine && roomManager.syncEngine.player) {
+        const player = roomManager.syncEngine.player;
+        _savedYouTubeState = {
+          videoId: roomManager.syncEngine.currentSourceValue,
+          currentTime: player.getCurrentTime ? player.getCurrentTime() : 0,
+          isPaused: player.isPaused ? player.isPaused() : true
+        };
+        console.log('[render] Saved YouTube state:', _savedYouTubeState);
+      } else {
+        _savedYouTubeState = null;
+      }
       
       // Re-render if source OR hasEnteredTheater changed
       if (newSource !== lastSource || newEnteredTheater !== lastEnteredTheater) {

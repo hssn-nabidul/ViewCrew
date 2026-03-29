@@ -57,7 +57,7 @@ const render = () => {
     if (cleanupRender) {
       cleanupRender();
     }
-    cleanupRender = RoomUI.initListeners(roomManager);
+    cleanupRender = RoomUI.initListeners(roomManager, render);
 
     // Apply any pending source now that the container should exist in the DOM
     if (roomManager.syncEngine && roomManager.syncEngine.tryApplyPendingSource) {

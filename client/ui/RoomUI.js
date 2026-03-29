@@ -672,7 +672,7 @@ export const RoomUI = {
     `;
   },
 
-  initListeners: (roomManager) => {
+  initListeners: (roomManager, render) => {
     // Mobile Chat Overlay - show/hide without re-rendering
     const mobileChatOverlay = document.querySelector('#mobile-chat-overlay');
     const mobileChatMessages = document.querySelector('#mobile-chat-messages');

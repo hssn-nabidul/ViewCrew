@@ -41,7 +41,7 @@ const peerServer = ExpressPeerServer(httpServer, {
 
 // Socket.io server with CORS
 const corsOrigins = process.env.CORS_ORIGINS 
-  ? process.env.CORS_ORIGINS.split(',') 
+  ? process.env.CORS_ORIGINS.split(',').map(o => o.trim()) 
   : ['http://localhost:5173', 'https://view-crew.vercel.app'];
   
 const io = new Server(httpServer, {
@@ -137,10 +137,12 @@ process.on('SIGINT', shutdown);
 // Global unhandled error handlers
 process.on('unhandledRejection', (reason: unknown) => {
   console.error('[Server] Unhandled Promise Rejection:', reason);
+  process.exit(1);
 });
 
 process.on('uncaughtException', (error: Error) => {
   console.error('[Server] Uncaught Exception:', error);
+  process.exit(1);
 });
 
 // Global Express error handler (must be after all routes)

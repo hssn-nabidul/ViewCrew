@@ -142,49 +142,6 @@ export class ScreenPlayer extends PlayerInterface {
     }, 1000);
   }
 
-  _showEasyUnmuteOverlay() {
-    if (!this.video || !this.video.muted) return;
-    if (document.getElementById('unmute-overlay')) return;
-
-    const container = document.getElementById(this.containerId);
-    if (!container) return;
-
-    const overlay = document.createElement('div');
-    overlay.id = 'unmute-overlay';
-    // Use high z-index and fixed positioning to ensure it's clickable above all else
-    overlay.style.cssText = `
-      position: absolute;
-      inset: 0;
-      z-index: 9999;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0,0,0,0.2);
-      backdrop-filter: blur(1px);
-      cursor: pointer;
-    `;
-
-    overlay.innerHTML = `
-      <div style="background:rgba(0,0,0,0.6); padding: 20px; border-radius: 20px; text-align:center;">
-        <span class="material-symbols-outlined" style="color:white; font-size: 64px; margin-bottom: 10px;">volume_off</span>
-        <div style="color:white; font-weight: bold; letter-spacing: 2px; font-size: 14px;">TAP TO UNMUTE</div>
-      </div>
-    `;
-
-    overlay.onclick = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (this.video) {
-        this.video.muted = false;
-        this.video.play().catch(console.error);
-      }
-      overlay.remove();
-    };
-
-    container.appendChild(overlay);
-  }
-
   _attachStreamListeners(stream) {
     stream.onaddtrack = () => {
       console.log('[ScreenPlayer] Track added, retrying play');

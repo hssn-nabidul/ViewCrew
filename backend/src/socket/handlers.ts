@@ -32,14 +32,12 @@ const chatMessageWindow = new Map<string, number>();
 // Socket event rate limiters
 const syncLimiter = createRateLimiter({ maxEvents: 10, windowMs: 1000, blockMs: 5000 });
 const reactionLimiter = createRateLimiter({ maxEvents: 5, windowMs: 1000, blockMs: 3000 });
-const signalingLimiter = createRateLimiter({ maxEvents: 20, windowMs: 1000, blockMs: 5000 });
 const generalLimiter = createRateLimiter({ maxEvents: 15, windowMs: 1000, blockMs: 3000 });
 
 // Cleanup stale rate limiter entries every 60s
 setInterval(() => {
   syncLimiter.cleanup();
   reactionLimiter.cleanup();
-  signalingLimiter.cleanup();
   generalLimiter.cleanup();
 }, 60000);
 
@@ -176,22 +174,6 @@ export function setupSocketHandlers(io: Server): void {
       socket.to(roomId.toUpperCase()).emit('user-speaking', { userId, isSpeaking });
     });
 
-    socket.on('offer', (data: { targetId: string; offer: any; callerId: string }) => {
-      if (!checkRateLimit(socket, signalingLimiter, 'offer')) return;
-      relayToUser(io, socketData.roomId, data.targetId, 'offer', data);
-    });
-
-    socket.on('answer', (data: { targetId: string; answer: any; callerId: string }) => {
-      if (!checkRateLimit(socket, signalingLimiter, 'answer')) return;
-      relayToUser(io, socketData.roomId, data.targetId, 'answer', data);
-    });
-
-    socket.on('ice-candidate', (data: { targetId: string; candidate: any; senderId: string }) => {
-      if (!checkRateLimit(socket, signalingLimiter, 'ice-candidate')) return;
-      relayToUser(io, socketData.roomId, data.targetId, 'ice-candidate', data);
-    });
-
-
     // sync-event: Relay playback control from host to viewers
     socket.on('sync-event', (data: { roomId: string; type: string; time: number; source?: string; sourceValue?: string }) => {
       if (!checkRateLimit(socket, syncLimiter, 'sync-event')) return;
@@ -306,7 +288,10 @@ export function setupSocketHandlers(io: Server): void {
     // chat-message: Broadcast chat message to room
     socket.on('chat-message', (data: { message: string }) => {
       const roomId = socketData.roomId;
-      if (!roomId || !socketData.userId || !socketData.displayName) return;
+      if (!roomId || !socketData.userId || !socketData.displayName) {
+        socket.emit('error', { code: 'NOT_IN_ROOM', message: 'Must join a room to send messages' });
+        return;
+      }
       
       // Rate limiting - check if user is sending too fast
       const now = Date.now();
@@ -374,21 +359,9 @@ export function setupSocketHandlers(io: Server): void {
       chatMessageWindow.delete(socket.id);
       syncLimiter.reset(socket.id);
       reactionLimiter.reset(socket.id);
-      signalingLimiter.reset(socket.id);
       generalLimiter.reset(socket.id);
     });
   });
-}
-
-function relayToUser(io: Server, roomId: string | undefined, targetId: string, event: string, data: any) {
-  if (!roomId) return;
-  const room = getRoom(roomId);
-  if (!room) return;
-  
-  const target = room.participants.get(targetId);
-  if (target && target.socketId) {
-    io.to(target.socketId).emit(event, data);
-  }
 }
 
 async function handleLeaveRoom(io: Server, socket: Socket, roomId: string, userId: string): Promise<void> {

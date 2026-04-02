@@ -19,6 +19,7 @@ export class RoomManager {
     this._pendingScreenStream = null;
     this.hasEnteredTheater = false;
     this.isReconnecting = false;
+    this._refreshTimeouts = [];
 
     this.setupListeners();
     this.setupPeerManagerCallbacks();
@@ -312,12 +313,20 @@ export class RoomManager {
       
       if (videoElement.videoWidth <= requiredWidth && retries > 0) {
         console.log(`[RoomManager] Waiting for video dimensions...`);
-        setTimeout(() => this.refreshLocalStream(videoElement, retries - 1), 1000);
+        const id = setTimeout(() => {
+          this._refreshTimeouts = this._refreshTimeouts.filter(t => t !== id);
+          this.refreshLocalStream(videoElement, retries - 1);
+        }, 1000);
+        this._refreshTimeouts.push(id);
         return;
       }
 
       if (videoElement.readyState < 3 && retries > 0) {
-        setTimeout(() => this.refreshLocalStream(videoElement, retries - 1), 500);
+        const id = setTimeout(() => {
+          this._refreshTimeouts = this._refreshTimeouts.filter(t => t !== id);
+          this.refreshLocalStream(videoElement, retries - 1);
+        }, 500);
+        this._refreshTimeouts.push(id);
         return;
       }
 
@@ -333,7 +342,13 @@ export class RoomManager {
       const tracks = rawStream.getTracks();
       if (tracks.length === 0 || tracks[0].readyState !== 'live') {
         console.warn('[RoomManager] Captured stream not ready yet, retrying...');
-        if (retries > 0) setTimeout(() => this.refreshLocalStream(videoElement, retries - 1), 500);
+        if (retries > 0) {
+          const id = setTimeout(() => {
+            this._refreshTimeouts = this._refreshTimeouts.filter(t => t !== id);
+            this.refreshLocalStream(videoElement, retries - 1);
+          }, 500);
+          this._refreshTimeouts.push(id);
+        }
         return;
       }
 
@@ -359,7 +374,8 @@ export class RoomManager {
       const cleanupDelay = isMobile ? 1500 : 800;
       
       this.peerManager.stopScreenShare();
-      setTimeout(() => {
+      const id = setTimeout(() => {
+        this._refreshTimeouts = this._refreshTimeouts.filter(t => t !== id);
         // Mute local video so host doesn't hear their own audio from speakers
         if (videoElement) {
           videoElement.muted = true;
@@ -377,10 +393,15 @@ export class RoomManager {
         });
         console.log('[RoomManager] Local stream captured and shared successfully.');
       }, cleanupDelay);
+      this._refreshTimeouts.push(id);
     } catch (err) {
       console.error('[RoomManager] captureStream error:', err);
       if (retries > 0) {
-        setTimeout(() => this.refreshLocalStream(videoElement, retries - 1), 1000);
+        const id = setTimeout(() => {
+          this._refreshTimeouts = this._refreshTimeouts.filter(t => t !== id);
+          this.refreshLocalStream(videoElement, retries - 1);
+        }, 1000);
+        this._refreshTimeouts.push(id);
       }
     }
   }
@@ -392,6 +413,9 @@ export class RoomManager {
       clearTimeout(this._refreshTimeout);
       this._refreshTimeout = null;
     }
+    
+    this._refreshTimeouts.forEach(id => clearTimeout(id));
+    this._refreshTimeouts = [];
     
     if (this.socket) {
       this.socket.off('connect');

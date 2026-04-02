@@ -11,8 +11,6 @@ export class SyncEngine {
     this.player = null;
     this.currentSource = null;
     this.currentSourceValue = null;
-    this.DRIFT_THRESHOLD = 3;
-    this.SYNC_INTERVAL = 5000;
     this.onSourceLoaded = null;
     this.onSourceApplied = null;
     this.lastSource = null;
@@ -207,9 +205,13 @@ export class SyncEngine {
       this.player = new YouTubePlayer(this.containerId, onEvent, onReady);
       this.player.load(value);
     } else if (source === 'url' || source === 'local') {
-      this.player = new HTMLVideoPlayer(this.containerId, onEvent);
+      this.player = new HTMLVideoPlayer(this.containerId, (type, data) => {
+        onEvent(type, data);
+        if (type === 'ready') {
+          onReady();
+        }
+      });
       this.player.load(value);
-      onReady();
     } else if (source === 'screen') {
       this.player = new ScreenPlayer(this.containerId, onEvent);
       if (this._pendingStream) {
@@ -435,9 +437,13 @@ export class SyncEngine {
       this.player = new YouTubePlayer(this.containerId, onEvent, onReady);
       this.player.load(value);
     } else if (source === 'url' || source === 'local') {
-      this.player = new HTMLVideoPlayer(this.containerId, onEvent);
+      this.player = new HTMLVideoPlayer(this.containerId, (type, data) => {
+        onEvent(type, data);
+        if (type === 'ready') {
+          onReady();
+        }
+      });
       this.player.load(value);
-      onReady();
     } else if (source === 'screen') {
       this.player = new ScreenPlayer(this.containerId, onEvent);
       if (this._pendingStream) {
@@ -491,5 +497,3 @@ export class SyncEngine {
     console.log('[SyncEngine] Cleanup complete');
   }
 };
-
-// MODIFIED FOR ROLLBACK TEST

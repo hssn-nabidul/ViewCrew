@@ -1,5 +1,31 @@
 import { PlayerInterface } from './PlayerInterface';
 
+let apiReadyCallbacks = [];
+let apiLoaded = false;
+
+function loadYouTubeAPI() {
+  if (window.YT && window.YT.Player) {
+    apiLoaded = true;
+    return;
+  }
+
+  if (!document.getElementById('yt-api-script')) {
+    const tag = document.createElement('script');
+    tag.id = 'yt-api-script';
+    tag.src = "https://www.youtube.com/iframe_api";
+    tag.onerror = (e) => console.error('[YouTubePlayer] Failed to load YouTube API:', e);
+    const firstScriptTag = document.getElementsByTagName('script')[0];
+    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+  }
+
+  window.onYouTubeIframeAPIReady = () => {
+    apiLoaded = true;
+    const callbacks = apiReadyCallbacks;
+    apiReadyCallbacks = [];
+    callbacks.forEach(cb => cb());
+  };
+}
+
 export class YouTubePlayer extends PlayerInterface {
   constructor(containerId, onEvent, onReady) {
     super(containerId, onEvent);
@@ -18,20 +44,17 @@ export class YouTubePlayer extends PlayerInterface {
       return;
     }
 
-    if (!document.getElementById('yt-api-script')) {
-      console.log('[YouTubePlayer] Loading YouTube IFrame API...');
-      const tag = document.createElement('script');
-      tag.id = 'yt-api-script';
-      tag.src = "https://www.youtube.com/iframe_api";
-      tag.onerror = (e) => console.error('[YouTubePlayer] Failed to load YouTube API:', e);
-      const firstScriptTag = document.getElementsByTagName('script')[0];
-      firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+    loadYouTubeAPI();
+
+    if (apiLoaded) {
+      this.isReady = true;
+      return;
     }
 
-    window.onYouTubeIframeAPIReady = () => {
+    apiReadyCallbacks.push(() => {
       console.log('[YouTubePlayer] YouTube API ready');
       this.isReady = true;
-    };
+    });
   }
 
   load(videoId) {
@@ -129,5 +152,6 @@ export class YouTubePlayer extends PlayerInterface {
     if (this.player && typeof this.player.destroy === 'function') {
       this.player.destroy(); 
     }
+    this.player = null;
   }
 }

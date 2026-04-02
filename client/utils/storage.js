@@ -10,6 +10,9 @@ export const storage = {
     }
     return userId;
   },
+  setUserId: (id) => {
+    localStorage.setItem(USER_ID_KEY, id);
+  },
   getDisplayName: (userId) => {
     return localStorage.getItem(DISPLAY_NAME_KEY) || `User_${userId}`;
   },

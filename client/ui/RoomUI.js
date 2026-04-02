@@ -199,18 +199,6 @@ export const RoomUI = {
     `;
   },
 
-  renderView: (view, roomId, participants, userId, currentSource, isHost) => {
-    switch (view) {
-      case 'lobby': return RoomUI.renderLobbyView(participants, userId, roomId);
-      case 'watch': return RoomUI.renderWatchView(currentSource, currentSourceValue, participants, userId, isHost);
-      case 'chat': return RoomUI.renderChatView(participants, userId);
-      case 'people': return RoomUI.renderPeopleView(participants, userId);
-      case 'settings': return RoomUI.renderSettingsView(participants, userId);
-      case 'source': return RoomUI.renderSourceView();
-      default: return RoomUI.renderLobbyView(participants, userId, roomId);
-    }
-  },
-
   renderLobbyView: (participants, userId, roomId) => {
     const me = participants.find(p => p.userId === userId || p.id === userId);
     const displayName = me ? me.displayName : '';
@@ -1158,7 +1146,6 @@ export const RoomUI = {
     // Return cleanup function to remove listeners
     return () => {
       cancelAnimationFrame(RoomUI.seekAnimationFrame);
-      document.removeEventListener('show-video-controls', RoomUI._showControlsHandler);
     };
   },
 
@@ -1190,9 +1177,14 @@ export const RoomUI = {
   showReaction: (data) => {
     const container = document.querySelector('#video-container');
     if (!container) return;
+    const emojiMap = {
+      heart: '❤️', laugh: '😂', wow: '😮', cry: '😢',
+      clap: '👏', fire: '🔥', love: '😍', skull: '💀'
+    };
+    const emoji = emojiMap[data.emojiId] || data.emojiId;
     const r = document.createElement('div');
     r.className = 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-6xl animate-bounce pointer-events-none z-50';
-    r.textContent = data.emojiId;
+    r.textContent = emoji;
     container.appendChild(r);
     setTimeout(() => r.remove(), 2000);
   }

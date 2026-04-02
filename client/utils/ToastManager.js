@@ -84,12 +84,13 @@ export class ToastManager {
 
     el.innerHTML = `
       <span class="material-symbols-outlined toast-icon" aria-hidden="true">${icon}</span>
-      <span class="toast-message">${toast.message}</span>
+      <span class="toast-message"></span>
       <button class="toast-dismiss" aria-label="Dismiss notification">
         <span class="material-symbols-outlined" style="font-size: 16px;">close</span>
       </button>
     `;
 
+    el.querySelector('.toast-message').textContent = toast.message;
     el.querySelector('.toast-dismiss').onclick = () => this.dismiss(toast.id);
 
     this.container.appendChild(el);

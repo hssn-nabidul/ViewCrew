@@ -214,7 +214,7 @@ const render = () => {
           const data = await roomManager.createRoom(finalName);
           if (data.roomId && data.participantId) {
             userId = data.participantId;
-            localStorage.setItem('watchsync-userId', userId);
+            storage.setUserId(userId);
             window.location.href = `?room=${data.roomId}`;
           }
         } catch (err) {
@@ -236,7 +236,7 @@ const render = () => {
             
             if (data.participantId) {
               userId = data.participantId;
-              localStorage.setItem('watchsync-userId', userId);
+              storage.setUserId(userId);
               window.location.href = `?room=${room}`;
             } else {
               alert(data.message || 'Failed to join room.');

@@ -15,7 +15,7 @@ export class ReactionManager {
     this.onSendReaction = onSendReaction;
     this.picker = null;
     this.isVisible = false;
-    this.reactionElements = new Map();
+    this._handleOutsideClick = this._handleOutsideClick.bind(this);
   }
 
   init() {
@@ -90,11 +90,13 @@ export class ReactionManager {
       this.hide();
     });
 
-    document.addEventListener('click', (e) => {
-      if (this.isVisible && !this.picker.contains(e.target) && !e.target.closest('[data-reaction-trigger]')) {
-        this.hide();
-      }
-    });
+    document.addEventListener('click', this._handleOutsideClick);
+  }
+
+  _handleOutsideClick(e) {
+    if (this.isVisible && this.picker && !this.picker.contains(e.target) && !e.target.closest('[data-reaction-trigger]')) {
+      this.hide();
+    }
   }
 
   _animateReaction(emoji) {
@@ -132,8 +134,7 @@ export class ReactionManager {
   }
 
   destroy() {
-    this.reactionElements.forEach(el => el.remove());
-    this.reactionElements.clear();
+    document.removeEventListener('click', this._handleOutsideClick);
 
     if (this.picker && this.picker.parentNode) {
       this.picker.parentNode.removeChild(this.picker);

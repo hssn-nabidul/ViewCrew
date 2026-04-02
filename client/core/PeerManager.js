@@ -1,25 +1,28 @@
 import { Peer } from 'peerjs';
 
-const ICE_SERVERS = [
-  { urls: 'stun:stun.l.google.com:19302' },
-  { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'stun:stun2.l.google.com:19302' },
-  {
-    urls: 'turn:openrelay.metered.ca:80',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
-  },
-  {
-    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-    username: 'openrelayproject',
-    credential: 'openrelayproject'
+function getIceServers() {
+  const servers = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+  ];
+
+  const turnUrl = import.meta.env.VITE_TURN_URL;
+  const turnUser = import.meta.env.VITE_TURN_USER;
+  const turnCred = import.meta.env.VITE_TURN_CREDENTIAL;
+
+  if (turnUrl) {
+    servers.push({
+      urls: turnUrl,
+      username: turnUser || 'user',
+      credential: turnCred || ''
+    });
   }
-];
+
+  return servers;
+}
+
+const ICE_SERVERS = getIceServers();
 
 export class PeerManager {
   constructor(apiUrl, userId) {
@@ -213,8 +216,11 @@ export class PeerManager {
         calls.screen.close();
       }
     });
-    // Don't stop tracks - keep stream cached for late joiners
-    this.screenStream = null;
+    if (this.screenStream) {
+      this.screenStream.getTracks().forEach(t => t.stop());
+      this.screenStream = null;
+    }
+    this._cachedScreenStream = null;
   }
 
   destroy() {
@@ -222,6 +228,11 @@ export class PeerManager {
       if (calls.screen) calls.screen.close();
     });
     this.calls.clear();
+    if (this.screenStream) {
+      this.screenStream.getTracks().forEach(t => t.stop());
+      this.screenStream = null;
+    }
+    this._cachedScreenStream = null;
     if (this.peer) this.peer.destroy();
   }
 }

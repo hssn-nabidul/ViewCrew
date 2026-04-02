@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Landing Page', () => {
   test('loads the landing page with correct title and elements', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await expect(page).toHaveTitle(/WatchSync/);
     await expect(page.getByRole('link', { name: 'ViewCrew Home' })).toBeVisible();
@@ -16,7 +16,7 @@ test.describe('Landing Page', () => {
 
   test('room code input limits to 6 characters', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     const roomInput = page.getByLabel('Room code to join');
     await roomInput.fill('ABCDEF123');
@@ -25,7 +25,7 @@ test.describe('Landing Page', () => {
 
   test('shows alert for invalid room code', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     page.on('dialog', dialog => dialog.dismiss());
 
@@ -39,7 +39,7 @@ test.describe('Landing Page', () => {
 test.describe('Room Creation (requires backend)', () => {
   test('creates a room and navigates to room view', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await page.getByLabel('Your Name').fill('TestHost');
     await page.locator('#btnCreateRoom').click();
@@ -55,7 +55,7 @@ test.describe('Room Creation (requires backend)', () => {
 test.describe('Room View (requires backend)', () => {
   test('shows room code in header after joining', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await page.getByLabel('Your Name').fill('TestViewer');
     await page.locator('#btnCreateRoom').click();
@@ -64,25 +64,26 @@ test.describe('Room View (requires backend)', () => {
     const url = new URL(page.url());
     const roomId = url.searchParams.get('room');
 
-    await expect(page.getByText(roomId)).toBeVisible();
+    await expect(page.getByText(roomId)).toBeVisible({ timeout: 10000 });
   });
 
   test('shows copy button for room code', async ({ page }) => {
     await page.goto('/');
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('load');
 
     await page.getByLabel('Your Name').fill('TestHost');
     await page.locator('#btnCreateRoom').click();
     await page.waitForURL(/\?room=[A-Z0-9]{6}/, { timeout: 10000 });
 
     const copyBtn = page.getByLabel('Copy room code');
-    await expect(copyBtn).toBeVisible();
+    await expect(copyBtn).toBeVisible({ timeout: 10000 });
   });
 
-  test('shows waiting for host state for non-host', async ({ context }) => {
-    const hostPage = await context.newPage();
+  test('shows waiting for host state for non-host', async ({ browser }) => {
+    const hostContext = await browser.newContext();
+    const hostPage = await hostContext.newPage();
     await hostPage.goto('/');
-    await hostPage.waitForLoadState('networkidle');
+    await hostPage.waitForLoadState('load');
     await hostPage.getByLabel('Your Name').fill('Host');
     await hostPage.locator('#btnCreateRoom').click();
     await hostPage.waitForURL(/\?room=[A-Z0-9]{6}/, { timeout: 10000 });
@@ -90,13 +91,10 @@ test.describe('Room View (requires backend)', () => {
     const hostUrl = new URL(hostPage.url());
     const roomId = hostUrl.searchParams.get('room');
 
-    const viewerPage = await context.newPage();
+    const viewerContext = await browser.newContext();
+    const viewerPage = await viewerContext.newPage();
     await viewerPage.goto(`/?room=${roomId}`);
-    await viewerPage.waitForLoadState('networkidle');
-
-    await viewerPage.getByLabel('Your Name').fill('Viewer');
-    await viewerPage.locator('#btnJoinRoom').click();
-    await viewerPage.waitForURL(/\?room=[A-Z0-9]{6}/, { timeout: 10000 });
+    await viewerPage.waitForLoadState('load');
 
     await expect(viewerPage.getByText('Waiting for the Host')).toBeVisible({ timeout: 10000 });
   });

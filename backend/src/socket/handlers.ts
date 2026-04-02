@@ -92,10 +92,25 @@ export function setupSocketHandlers(io: Server): void {
         }
         
         // Find participant in room
-        const participant = room.participants.get(userId);
+        let participant = room.participants.get(userId);
         if (!participant) {
-          socket.emit('error', { code: 'PARTICIPANT_NOT_FOUND', message: 'Participant not found' });
-          return;
+          // Auto-add participant if not already in room (e.g., direct URL navigation)
+          if (room.participants.size >= 4) {
+            socket.emit('error', { code: 'ROOM_FULL', message: 'Room is full' });
+            return;
+          }
+          participant = {
+            id: userId,
+            socketId: socket.id,
+            displayName,
+            joinedAt: new Date(),
+            isHost: false
+          };
+          room.participants.set(userId, participant);
+          if (room.destroyTimer) {
+            clearTimeout(room.destroyTimer);
+            room.destroyTimer = null;
+          }
         }
 
         // If joining as host, validate host token

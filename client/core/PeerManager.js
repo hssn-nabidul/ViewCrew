@@ -46,10 +46,14 @@ export class PeerManager {
     });
 
     this.screenStream = null;
+    this.voiceStream = null;
     this._cachedScreenStream = null;
     this.calls = new Map();
+    this.dataChannels = new Map();
     this.onRemoteStream = null;
     this.onRemoteStreamRemoved = null;
+    this.onDataChannel = null;
+    this.onDataChannelMessage = null;
 
     this.setupListeners();
   }
@@ -63,18 +67,115 @@ export class PeerManager {
       const type = call.metadata?.type || 'screen';
       console.log(`[PeerManager] Receiving ${type} call from: ${call.peer}`);
 
-      // Always answer with empty stream for screen share
-      call.answer(new MediaStream());
+      if (type === 'voice' && this.voiceStream) {
+        call.answer(this.voiceStream);
+      } else if (type === 'screen' && this.screenStream) {
+        call.answer(this.screenStream);
+      } else {
+        call.answer(new MediaStream());
+      }
       this.handleCall(call, type);
     });
 
     this.peer.on('error', (err) => {
       console.error('[PeerManager] PeerJS Error:', err.type, err);
     });
+
+    this.peer.on('dataConnection', (conn) => {
+      console.log(`[PeerManager] Incoming data connection from: ${conn.peer}`);
+      this._setupDataChannel(conn);
+    });
+  }
+
+  _setupDataChannel(conn) {
+    conn.on('open', () => {
+      console.log(`[PeerManager] DataChannel open with: ${conn.peer}`);
+      if (this.onDataChannel) {
+        this.onDataChannel(conn.peer, conn);
+      }
+    });
+
+    conn.on('data', (data) => {
+      if (this.onDataChannelMessage) {
+        this.onDataChannelMessage(conn.peer, data);
+      }
+    });
+
+    conn.on('close', () => {
+      console.log(`[PeerManager] DataChannel closed with: ${conn.peer}`);
+      this.dataChannels.delete(conn.peer);
+    });
+
+    conn.on('error', (err) => {
+      console.error(`[PeerManager] DataChannel error with ${conn.peer}:`, err);
+    });
+
+    const channels = this.dataChannels.get(conn.peer) || [];
+    channels.push(conn);
+    this.dataChannels.set(conn.peer, channels);
+  }
+
+  createDataChannel(remoteUserId, label = 'file-stream') {
+    const existing = this.dataChannels.get(remoteUserId);
+    if (existing && existing.length > 0) {
+      console.log(`[PeerManager] DataChannel already exists for ${remoteUserId}`);
+      return existing[0];
+    }
+
+    console.log(`[PeerManager] Creating DataChannel to ${remoteUserId} (${label})`);
+    const conn = this.peer.connect(remoteUserId, {
+      label,
+      reliable: true,
+      serialization: 'binary',
+      metadata: { type: 'file-stream' }
+    });
+
+    this._setupDataChannel(conn);
+    return conn;
+  }
+
+  createDataChannelsToAll(remoteUserIds, label = 'file-stream') {
+    remoteUserIds.forEach(id => {
+      if (id !== this.userId) {
+        this.createDataChannel(id, label);
+      }
+    });
+  }
+
+  sendDataToAll(data) {
+    this.dataChannels.forEach((channels) => {
+      channels.forEach(conn => {
+        if (conn.open) {
+          try {
+            conn.send(data);
+          } catch (err) {
+            console.warn('[PeerManager] Failed to send data:', err.message);
+          }
+        }
+      });
+    });
+  }
+
+  closeDataChannels() {
+    this.dataChannels.forEach((channels) => {
+      channels.forEach(conn => {
+        try {
+          conn.close();
+        } catch {
+          // Ignore close errors
+        }
+      });
+    });
+    this.dataChannels.clear();
   }
 
   callPeer(remoteUserId, type = 'screen') {
-    const stream = this.screenStream;
+    let stream;
+    if (type === 'voice') {
+      stream = this.voiceStream;
+    } else {
+      stream = this.screenStream;
+    }
 
     if (!stream) {
       console.warn(`[PeerManager] Cannot call ${type} — stream not ready`);
@@ -95,8 +196,8 @@ export class PeerManager {
       metadata: { type },
       constraints: {
         mandatory: {
-          OfferToReceiveAudio: false,
-          OfferToReceiveVideo: true
+          OfferToReceiveAudio: type === 'voice',
+          OfferToReceiveVideo: type === 'screen'
         }
       },
       sdpTransform: isMobile ? (sdp) => {
@@ -211,7 +312,7 @@ export class PeerManager {
   }
 
   stopScreenShare() {
-    this.calls.forEach((calls) => {
+    this.calls.forEach(calls => {
       if (calls.screen) {
         calls.screen.close();
       }
@@ -223,9 +324,35 @@ export class PeerManager {
     this._cachedScreenStream = null;
   }
 
+  setVoiceStream(stream) {
+    this.voiceStream = stream;
+  }
+
+  callAllWithVoice(remoteUserIds) {
+    if (!this.voiceStream) {
+      console.warn('[PeerManager] Cannot start voice — voice stream not set');
+      return;
+    }
+    remoteUserIds.forEach(id => {
+      if (id !== this.userId) {
+        this.callPeer(id, 'voice');
+      }
+    });
+  }
+
+  stopVoiceCalls() {
+    this.calls.forEach(calls => {
+      if (calls.voice) {
+        calls.voice.close();
+      }
+    });
+  }
+
   destroy() {
+    this.closeDataChannels();
     this.calls.forEach(calls => {
       if (calls.screen) calls.screen.close();
+      if (calls.voice) calls.voice.close();
     });
     this.calls.clear();
     if (this.screenStream) {
@@ -233,6 +360,10 @@ export class PeerManager {
       this.screenStream = null;
     }
     this._cachedScreenStream = null;
+    if (this.voiceStream) {
+      this.voiceStream.getTracks().forEach(t => t.stop());
+      this.voiceStream = null;
+    }
     if (this.peer) this.peer.destroy();
   }
 }

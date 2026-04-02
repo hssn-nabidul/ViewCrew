@@ -1,4 +1,5 @@
 import { escapeHtml, escapeAttr } from '../utils/sanitize.js';
+import { parseYouTubeUrl } from '../utils/youtubeParser.js';
 export const RoomUI = {
   currentTab: 'watch',
   sidebarTab: 'chat',
@@ -36,7 +37,7 @@ export const RoomUI = {
     RoomUI.sidebarTab = tab;
   },
 
-  render: (roomId, participants, userId, currentSource, currentSourceValue, hasEnteredTheater, isReconnecting = false) => {
+  render: (roomId, participants, userId, currentSource, currentSourceValue, hasEnteredTheater, isReconnecting = false, fileTransfer = null) => {
     if (!hasEnteredTheater) {
       return RoomUI.renderLobbyView(participants, userId, roomId);
     }
@@ -78,6 +79,13 @@ export const RoomUI = {
             <span class="live-indicator text-[10px]" aria-live="polite" aria-atomic="true">
               Synced
             </span>
+            <button 
+              id="btnMicToggle" 
+              class="touch-target flex items-center justify-center text-on-surface-variant hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+              aria-label="Toggle microphone"
+            >
+              <span class="material-symbols-outlined" aria-hidden="true">mic</span>
+            </button>
             ${isHost ? `
               <button 
                 id="btnOpenSource" 
@@ -100,7 +108,7 @@ export const RoomUI = {
         <main class="flex-1 flex overflow-hidden" role="main">
           <!-- Main Cinema Stage -->
           <div class="flex-1 flex flex-col relative bg-black overflow-hidden">
-            ${activeView === 'source' ? RoomUI.renderSourceView() : RoomUI.renderWatchView(currentSource, currentSourceValue, participants, userId, isHost)}
+            ${activeView === 'source' ? RoomUI.renderSourceView() : RoomUI.renderWatchView(currentSource, currentSourceValue, participants, userId, isHost, fileTransfer)}
           </div>
 
           <!-- Desktop Sidebar (Chat & People) -->
@@ -262,7 +270,7 @@ export const RoomUI = {
     `;
   },
 
-  renderWatchView: (currentSource, currentSourceValue, participants, userId, isHost) => {
+  renderWatchView: (currentSource, currentSourceValue, participants, userId, isHost, fileTransfer = null) => {
     const isWaiting = !currentSource && !isHost;
 
     if (isWaiting) {
@@ -338,6 +346,28 @@ export const RoomUI = {
           <div id="video-container" class="w-full h-full relative z-0 flex items-center justify-center" aria-live="polite">
             <!-- Video element injected here -->
           </div>
+
+          ${fileTransfer ? `
+          <div id="file-transfer-overlay" class="absolute inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-sm" role="status" aria-live="polite" aria-label="File transfer in progress">
+            <div class="text-center space-y-4 md:space-y-6 p-6 md:p-10 max-w-sm">
+              <div class="relative inline-block">
+                <div class="w-20 md:w-24 rounded-full bg-surface-elevated border-2 border-primary/30 flex items-center justify-center animate-pulse">
+                  <span class="material-symbols-outlined text-4xl md:text-5xl text-primary" aria-hidden="true">file_download</span>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <h3 class="text-lg md:text-xl font-bold text-on-surface truncate">${escapeHtml(fileTransfer.filename || 'Receiving file...')}</h3>
+                <p class="text-sm text-on-surface-variant/60">${fileTransfer.size ? (fileTransfer.size / (1024 * 1024)).toFixed(1) + ' MB' : 'Calculating...'}</p>
+              </div>
+              <div class="space-y-2">
+                <div class="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                  <div id="file-transfer-progress-bar" class="h-full bg-primary rounded-full transition-all duration-300" style="width: ${Math.round((fileTransfer.progress || 0) * 100)}%"></div>
+                </div>
+                <p class="text-xs font-mono font-bold text-on-surface-variant/80">${Math.round((fileTransfer.progress || 0) * 100)}% received</p>
+              </div>
+            </div>
+          </div>
+          ` : ''}
 
           <!-- Cinema Controls Overlay -->
           <div 
@@ -429,6 +459,11 @@ export const RoomUI = {
                       <span class="material-symbols-outlined text-xl md:text-2xl" id="volIcon" aria-hidden="true">volume_up</span>
                     </button>
                   </div>
+                  ${!isHost ? `
+                    <span class="text-[10px] md:text-xs font-medium text-white/40 tracking-wide" aria-label="Playback control notice">
+                      Host controls playback
+                    </span>
+                  ` : ''}
                 </div>
                 <div class="flex items-center gap-2 md:gap-4">
                    <button 
@@ -869,6 +904,27 @@ export const RoomUI = {
       };
     }
 
+    const btnMic = document.querySelector('#btnMicToggle');
+    if (btnMic) {
+      const micIcon = btnMic.querySelector('.material-symbols-outlined');
+      const isMuted = roomManager.voiceChat?.isMuted;
+      if (micIcon) {
+        micIcon.textContent = isMuted ? 'mic_off' : 'mic';
+      }
+      if (roomManager.micPermissionDenied) {
+        btnMic.disabled = true;
+        btnMic.classList.add('opacity-40', 'cursor-not-allowed');
+        btnMic.setAttribute('aria-label', 'Microphone permission denied');
+      }
+      btnMic.onclick = () => {
+        roomManager.toggleMicMute();
+        const icon = btnMic.querySelector('.material-symbols-outlined');
+        if (icon) {
+          icon.textContent = roomManager.voiceChat.isMuted ? 'mic_off' : 'mic';
+        }
+      };
+    }
+
     const btnSource = document.querySelector('#btnOpenSource');
     console.log('[RoomUI] btnOpenSource exists:', !!btnSource, 'isHost:', roomManager.participants.find(p => p.userId === roomManager.userId || p.id === roomManager.userId)?.isHost);
     if (btnSource) {
@@ -1018,9 +1074,18 @@ export const RoomUI = {
       btnStart.onclick = () => {
         const url = document.querySelector('#inputSourceUrl')?.value.trim();
         if (!url) return;
-        let source = 'url', val = url;
-        const yt = url.match(/(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
-        if (yt) { source = 'youtube'; val = yt[1]; }
+
+        const videoId = parseYouTubeUrl(url);
+        let source, val;
+        if (videoId) {
+          source = 'youtube';
+          val = videoId;
+        } else if (url.startsWith('http') || url.startsWith('blob:')) {
+          source = 'url';
+          val = url;
+        } else {
+          return;
+        }
         
         // Auto-enter theater when starting to watch
         if (!roomManager.hasEnteredTheater) {
@@ -1051,29 +1116,8 @@ export const RoomUI = {
       btnLocal.onclick = () => { inputLocal.value = ''; inputLocal.click(); };
       inputLocal.onchange = (e) => {
         const file = e.target.files[0];
-        if (file) {
-          const blobUrl = URL.createObjectURL(file);
-          
-          // Auto-enter theater
-          if (!roomManager.hasEnteredTheater) {
-            roomManager.hasEnteredTheater = true;
-          }
-          
-          // Switch to watch view (in case user had source selector open)
-          RoomUI.currentTab = 'watch';
-          
-          // Set pending source directly on syncEngine to update state before re-render
-          if (roomManager.syncEngine) {
-            roomManager.syncEngine._pendingSource = { source: 'local', value: blobUrl };
-            roomManager.syncEngine.currentSource = 'local';
-            roomManager.syncEngine.currentSourceValue = blobUrl;
-          }
-          
-          // Trigger re-render BEFORE changeSource so container exists
-          render();
-          
-          // Now change the source
-          roomManager.syncEngine.changeSource('local', blobUrl, roomManager.roomId);
+        if (file && roomManager.startFileStream) {
+          roomManager.startFileStream(file);
         }
       };
     }

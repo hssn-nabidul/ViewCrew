@@ -2,6 +2,9 @@ import { io } from 'socket.io-client';
 import { PeerManager } from './PeerManager';
 import { SyncEngine } from './SyncEngine';
 import { ScreenShare } from '../media/ScreenShare';
+import { VoiceChat } from '../media/VoiceChat';
+import { LocalFileStream } from '../media/LocalFileStream';
+import { LocalFileReceiver } from '../media/LocalFileReceiver';
 
 export class RoomManager {
   constructor(apiUrl, userId, displayName) {
@@ -12,6 +15,7 @@ export class RoomManager {
     this.peerManager = new PeerManager(apiUrl, userId);
     this.syncEngine = null;
     this.screenShare = new ScreenShare();
+    this.voiceChat = new VoiceChat();
     this.roomId = null;
     this.hostToken = null;
     this.participants = [];
@@ -21,9 +25,15 @@ export class RoomManager {
     this.hasEnteredTheater = false;
     this.isReconnecting = false;
     this._refreshTimeouts = [];
+    this._voiceStreams = new Map();
+    this.micPermissionDenied = false;
+    this.fileStream = new LocalFileStream();
+    this.fileReceiver = new LocalFileReceiver();
+    this.fileTransfer = null;
 
     this.setupListeners();
     this.setupPeerManagerCallbacks();
+    this.setupFileStreaming();
   }
 
   setupPeerManagerCallbacks() {
@@ -38,6 +48,9 @@ export class RoomManager {
           console.warn('[RoomManager] SyncEngine not ready, buffering screen stream');
           this._pendingScreenStream = remoteStream;
         }
+      } else if (type === 'voice') {
+        console.log('[RoomManager] Voice stream received from peer:', remoteUserId);
+        this._playRemoteVoice(remoteUserId, remoteStream);
       }
     };
 
@@ -45,6 +58,9 @@ export class RoomManager {
       if (type === 'screen') {
         console.log('[RoomManager] Screen stream removed from peer:', remoteUserId);
         this._pendingScreenStream = null;
+      } else if (type === 'voice') {
+        console.log('[RoomManager] Voice stream removed from peer:', remoteUserId);
+        this._stopRemoteVoice(remoteUserId);
       }
     };
   }
@@ -90,6 +106,16 @@ export class RoomManager {
           displayName: this.displayName,
           hostToken: this.hostToken
         });
+      }
+      // Re-establish voice calls after reconnect
+      if (this.voiceChat.isReady && this.participants.length > 0) {
+        setTimeout(() => {
+          const remoteUserIds = this.participants
+            .filter(p => p.userId !== this.userId)
+            .map(p => p.userId);
+          this.peerManager.callAllWithVoice(remoteUserIds);
+          console.log('[RoomManager] Voice calls re-established after reconnect');
+        }, 1000);
       }
     });
 
@@ -147,6 +173,8 @@ export class RoomManager {
       }
 
       if (this.onStateChange) this.onStateChange(this.participants);
+
+      this.initVoice();
     });
 
     this.socket.on('user-joined', (user) => {
@@ -155,9 +183,11 @@ export class RoomManager {
         this.participants.push(user);
 
         if (user.userId !== this.userId) {
-          // Only call for screen share if active
           if (this.screenShare.isActive()) {
             this.peerManager.callPeer(user.userId, 'screen');
+          }
+          if (this.voiceChat.isReady) {
+            this.peerManager.callPeer(user.userId, 'voice');
           }
         }
 
@@ -173,8 +203,10 @@ export class RoomManager {
       const leftUser = this.participants.find(p => p.userId === leftUserId);
       this.participants = this.participants.filter(p => p.userId !== leftUserId);
       
-      // Clean up peer connection
+      // Clean up peer connections
       this.peerManager.removeCallReference(leftUserId, 'screen');
+      this.peerManager.removeCallReference(leftUserId, 'voice');
+      this._stopRemoteVoice(leftUserId);
 
       if (this.onUserLeft) {
         this.onUserLeft(leftUser);
@@ -410,6 +442,216 @@ export class RoomManager {
     }
   }
 
+  _playRemoteVoice(remoteUserId, remoteStream) {
+    if (remoteStream.getAudioTracks().length === 0) {
+      console.log('[RoomManager] Ignoring voice stream with no audio tracks from:', remoteUserId);
+      return;
+    }
+
+    this._stopRemoteVoice(remoteUserId);
+
+    const audio = document.createElement('audio');
+    audio.autoplay = true;
+    audio.playsInline = true;
+    audio.srcObject = remoteStream;
+    audio.style.display = 'none';
+    audio.style.position = 'fixed';
+    audio.style.left = '-9999px';
+    audio.id = `voice-${remoteUserId}`;
+    document.body.appendChild(audio);
+
+    audio.play().catch(err => {
+      console.warn('[RoomManager] Voice autoplay failed:', err.message);
+    });
+
+    this._voiceStreams.set(remoteUserId, { element: audio, stream: remoteStream });
+    console.log('[RoomManager] Remote voice playback started for:', remoteUserId);
+  }
+
+  _stopRemoteVoice(remoteUserId) {
+    const entry = this._voiceStreams.get(remoteUserId);
+    if (entry) {
+      if (entry.element) {
+        entry.element.pause();
+        entry.element.srcObject = null;
+        entry.element.remove();
+      }
+      this._voiceStreams.delete(remoteUserId);
+      console.log('[RoomManager] Remote voice playback stopped for:', remoteUserId);
+    }
+  }
+
+  async initVoice() {
+    if (this.micPermissionDenied) return;
+
+    try {
+      await this.voiceChat.start();
+      this.peerManager.setVoiceStream(this.voiceChat.getStream());
+
+      this.voiceChat.onSpeakingChange = (isSpeaking) => {
+        if (this.roomId) {
+          this.socket.emit('user-speaking', {
+            roomId: this.roomId,
+            userId: this.userId,
+            isSpeaking
+          });
+        }
+      };
+
+      if (this.roomId && this.participants.length > 0) {
+        const remoteUserIds = this.participants
+          .filter(p => p.userId !== this.userId)
+          .map(p => p.userId);
+        this.peerManager.callAllWithVoice(remoteUserIds);
+      }
+
+      if (this.onMicChange) {
+        this.onMicChange(false);
+      }
+
+      console.log('[RoomManager] Voice chat initialized');
+    } catch (err) {
+      if (err.message === 'MIC_PERMISSION_DENIED') {
+        this.micPermissionDenied = true;
+        console.warn('[RoomManager] Microphone permission denied');
+        if (this.onMicPermissionDenied) {
+          this.onMicPermissionDenied();
+        }
+      } else {
+        console.error('[RoomManager] Voice chat init failed:', err.message);
+      }
+    }
+  }
+
+  setupFileStreaming() {
+    this.peerManager.onDataChannelMessage = (remoteUserId, data) => {
+      if (!(data instanceof ArrayBuffer)) return;
+
+      const view = new DataView(data);
+      const typeByte = view.getUint8(0);
+      let message;
+
+      if (typeByte === 0) {
+        const jsonStr = new TextDecoder().decode(data.slice(1));
+        message = JSON.parse(jsonStr);
+      } else if (typeByte === 1) {
+        const index = view.getUint32(1);
+        message = { type: 'file-chunk', index, data: data.slice(5) };
+      } else if (typeByte === 2) {
+        message = { type: 'file-end' };
+      }
+
+      if (!message) return;
+
+      if (message.type === 'file-meta') {
+        this.fileReceiver.init(message.mimeType).then((video) => {
+          this.fileReceiver.fileInfo = message;
+          this.fileReceiver.isReceiving = true;
+          this.fileTransfer = {
+            filename: message.filename,
+            size: message.size,
+            progress: 0,
+            totalChunks: message.totalChunks
+          };
+          if (this.onStateChange) this.onStateChange(this.participants);
+        }).catch(err => {
+          console.error('[RoomManager] Failed to init file receiver:', err);
+        });
+      } else if (message.type === 'file-chunk') {
+        this.fileReceiver.receiveChunk(message);
+        if (this.fileReceiver.fileInfo) {
+          this.fileTransfer.progress = this.fileReceiver.chunks.size / this.fileReceiver.fileInfo.totalChunks;
+          if (this.onStateChange) this.onStateChange(this.participants);
+        }
+      } else if (message.type === 'file-end') {
+        this.fileReceiver.receiveChunk(message);
+        this.fileTransfer = null;
+        if (this.onStateChange) this.onStateChange(this.participants);
+      }
+    };
+
+    this.fileStream.onProgress = (progress) => {
+      this.fileTransfer = {
+        filename: this.fileStream.file?.name || 'Streaming...',
+        size: this.fileStream.file?.size || 0,
+        progress,
+        totalChunks: this.fileStream.totalChunks
+      };
+      if (this.onStateChange) this.onStateChange(this.participants);
+    };
+
+    this.fileStream.onComplete = () => {
+      this.fileTransfer = null;
+      if (this.onStateChange) this.onStateChange(this.participants);
+    };
+  }
+
+  async startFileStream(file) {
+    if (!this.isHost && !this.participants.find(p => p.userId === this.userId)?.isHost) {
+      console.warn('[RoomManager] Only host can stream local files');
+      return;
+    }
+
+    if (!this.hasEnteredTheater) {
+      this.hasEnteredTheater = true;
+    }
+
+    if (this.syncEngine) {
+      this.syncEngine._pendingSource = { source: 'local', value: file.name };
+      this.syncEngine.currentSource = 'local';
+      this.syncEngine.currentSourceValue = file.name;
+    }
+
+    this.fileTransfer = {
+      filename: file.name,
+      size: file.size,
+      progress: 0,
+      totalChunks: Math.ceil(file.size / (16 * 1024))
+    };
+
+    if (this.onStateChange) this.onStateChange(this.participants);
+
+    const remoteUserIds = this.participants
+      .filter(p => p.userId !== this.userId)
+      .map(p => p.userId);
+
+    this.peerManager.createDataChannelsToAll(remoteUserIds, 'file-stream');
+
+    setTimeout(() => {
+      this.fileStream.start(file, (message) => {
+        let encoded;
+        if (message.type === 'file-meta') {
+          const jsonStr = JSON.stringify(message);
+          const encoder = new TextEncoder();
+          const encoded_json = encoder.encode(jsonStr);
+          encoded = new ArrayBuffer(encoded_json.length + 1);
+          new Uint8Array(encoded)[0] = 0;
+          new Uint8Array(encoded).set(encoded_json, 1);
+        } else if (message.type === 'file-chunk') {
+          encoded = new ArrayBuffer(5 + message.data.byteLength);
+          const view = new DataView(encoded);
+          view.setUint8(0, 1);
+          view.setUint32(1, message.index);
+          new Uint8Array(encoded, 5).set(new Uint8Array(message.data));
+        } else if (message.type === 'file-end') {
+          encoded = new ArrayBuffer(1);
+          new Uint8Array(encoded)[0] = 2;
+        }
+        if (encoded) {
+          this.peerManager.sendDataToAll(encoded);
+        }
+      });
+    }, 500);
+  }
+
+  toggleMicMute() {
+    if (!this.voiceChat.isReady) return;
+    this.voiceChat.toggleMute();
+    if (this.onMicChange) {
+      this.onMicChange(this.voiceChat.isMuted);
+    }
+  }
+
   destroy() {
     console.log('[RoomManager] Cleaning up resources...');
     
@@ -420,6 +662,27 @@ export class RoomManager {
     
     this._refreshTimeouts.forEach(id => clearTimeout(id));
     this._refreshTimeouts = [];
+    
+    if (this.voiceChat) {
+      this.voiceChat.stop();
+    }
+    
+    if (this.fileStream) {
+      this.fileStream.stop();
+    }
+    
+    if (this.fileReceiver) {
+      this.fileReceiver.cleanup();
+    }
+    
+    this._voiceStreams.forEach(({ element }) => {
+      if (element) {
+        element.pause();
+        element.srcObject = null;
+        element.remove();
+      }
+    });
+    this._voiceStreams.clear();
     
     if (this.socket) {
       this.socket.off('connect');

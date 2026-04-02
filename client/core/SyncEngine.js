@@ -22,6 +22,9 @@ export class SyncEngine {
     this._justAppliedPending = false;
     this._playerInitDone = false;
     this._pendingIsPlaying = false;
+    this._driftInterval = null;
+    this._lastHostTime = 0;
+    this._lastHostSyncAt = 0;
 
     this.setupListeners();
   }
@@ -60,6 +63,35 @@ export class SyncEngine {
       case 'seek':
         this.player.seek(time);
         break;
+    }
+
+    if (time !== undefined) {
+      this._lastHostTime = time;
+      this._lastHostSyncAt = Date.now();
+    }
+  }
+
+  _startDriftCorrection() {
+    this._stopDriftCorrection();
+    this._driftInterval = setInterval(() => {
+      if (this.isHost || !this.player || !this._lastHostSyncAt) return;
+
+      const elapsed = (Date.now() - this._lastHostSyncAt) / 1000;
+      const expectedTime = this._lastHostTime + elapsed;
+      const actualTime = this.player.getCurrentTime();
+      const drift = Math.abs(actualTime - expectedTime);
+
+      if (drift > 3) {
+        console.log(`[SyncEngine] Drift correction: ${drift.toFixed(1)}s, seeking to ${expectedTime.toFixed(1)}`);
+        this.player.seek(expectedTime);
+      }
+    }, 5000);
+  }
+
+  _stopDriftCorrection() {
+    if (this._driftInterval) {
+      clearInterval(this._driftInterval);
+      this._driftInterval = null;
     }
   }
 
@@ -170,6 +202,11 @@ export class SyncEngine {
         setTimeout(() => {
           if (this.player) this.player.play();
         }, 200);
+      }
+      
+      // Start drift correction for viewers
+      if (!this.isHost) {
+        this._startDriftCorrection();
       }
       
       this._pendingCurrentTime = 0;
@@ -403,6 +440,10 @@ export class SyncEngine {
           }, 200);
         }
         
+        if (!this.isHost) {
+          this._startDriftCorrection();
+        }
+        
         this._pendingCurrentTime = 0;
         this._pendingIsPlaying = false;
         return;
@@ -461,6 +502,8 @@ export class SyncEngine {
 
   cleanup() {
     console.log('[SyncEngine] Cleaning up resources...');
+    
+    this._stopDriftCorrection();
     
     // Clear pending timeouts
     if (this._sourceLoadedTimeout) {

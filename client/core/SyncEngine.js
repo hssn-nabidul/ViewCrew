@@ -491,3 +491,5 @@ export class SyncEngine {
     console.log('[SyncEngine] Cleanup complete');
   }
 };
+
+// MODIFIED FOR ROLLBACK TEST

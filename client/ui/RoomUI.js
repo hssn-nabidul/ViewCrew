@@ -36,7 +36,7 @@ export const RoomUI = {
     RoomUI.sidebarTab = tab;
   },
 
-  render: (roomId, participants, userId, currentSource, currentSourceValue, hasEnteredTheater) => {
+  render: (roomId, participants, userId, currentSource, currentSourceValue, hasEnteredTheater, isReconnecting = false) => {
     if (!hasEnteredTheater) {
       return RoomUI.renderLobbyView(participants, userId, roomId);
     }
@@ -51,6 +51,7 @@ export const RoomUI = {
 
     return `
       <div class="bg-background font-body text-on-surface min-h-screen flex flex-col overflow-hidden selection:bg-primary/30" role="application" aria-label="Watch party room">
+        ${isReconnecting ? '<div class="reconnecting-bar" role="alert" aria-live="assertive"></div>' : ''}
         <!-- TopAppBar -->
         <header class="flex items-center justify-between px-3 md:px-6 h-14 md:h-16 bg-black/80 backdrop-blur-xl border-b border-white/5 z-50 sticky top-0" role="banner">
           <div class="flex items-center gap-2 md:gap-4">
@@ -62,6 +63,16 @@ export const RoomUI = {
               <span class="material-symbols-outlined" aria-hidden="true">close</span>
             </button>
             <div class="text-lg md:text-xl font-black tracking-tighter text-primary">ViewCrew</div>
+            <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-white/5 rounded-lg border border-white/5">
+              <span class="text-[10px] font-mono font-bold tracking-widest text-on-surface-variant">${roomId}</span>
+              <button 
+                id="btnCopyRoomCode" 
+                class="touch-target flex items-center justify-center text-on-surface-variant hover:text-white hover:bg-white/10 rounded transition-colors p-0.5"
+                aria-label="Copy room code"
+              >
+                <span class="material-symbols-outlined text-sm" aria-hidden="true">content_copy</span>
+              </button>
+            </div>
           </div>
           <div class="flex items-center gap-2 md:gap-4">
             <span class="live-indicator text-[10px]" aria-live="polite" aria-atomic="true">
@@ -264,6 +275,69 @@ export const RoomUI = {
   },
 
   renderWatchView: (currentSource, currentSourceValue, participants, userId, isHost) => {
+    const isWaiting = !currentSource && !isHost;
+
+    if (isWaiting) {
+      return `
+        <div class="flex flex-col h-full bg-black relative">
+          <section 
+            id="video-stage" 
+            class="flex-1 flex items-center justify-center relative overflow-hidden"
+            role="region"
+            aria-label="Video player"
+          >
+            <div id="video-container" class="w-full h-full relative z-0 flex items-center justify-center" aria-live="polite">
+              <div class="waiting-for-host" role="status" aria-live="polite">
+                <div class="relative">
+                  <div class="w-20 h-20 rounded-full bg-surface-elevated border-2 border-white/10 flex items-center justify-center waiting-pulse">
+                    <span class="material-symbols-outlined text-4xl text-on-surface-variant/40" aria-hidden="true">hourglass_top</span>
+                  </div>
+                </div>
+                <div class="space-y-2">
+                  <h3 class="text-lg font-bold text-on-surface">Waiting for the Host</h3>
+                  <p class="text-sm text-on-surface-variant/60 max-w-xs">The commander hasn't loaded a video yet. Sit tight — the show will start soon.</p>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-on-surface-variant/40">
+                  <span class="material-symbols-outlined text-sm" aria-hidden="true">group</span>
+                  <span>${participants.length} crew member${participants.length !== 1 ? 's' : ''} waiting</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Room Metadata & Reactions (Mobile) -->
+          <section class="lg:hidden p-3 md:p-6 space-y-3 md:space-y-6 bg-surface border-t border-white/5" aria-label="Room info">
+             <div class="flex items-center justify-between">
+                <h4 class="text-xs md:text-sm font-bold uppercase tracking-[0.2em] text-on-surface-variant/60">Now Watching</h4>
+                <div class="flex -space-x-2" aria-hidden="true">
+                  ${participants.slice(0, 5).map(p => `
+                    <div class="w-6 md:w-8 h-6 md:h-8 rounded-full border-2 border-surface bg-surface-container-high flex items-center justify-center text-[8px] md:text-[10px] font-black text-primary uppercase" title="${escapeHtml(p.displayName)}">
+                      ${escapeHtml(p.displayName.charAt(0))}
+                    </div>
+                  `).join('')}
+                </div>
+             </div>
+             <button 
+              data-tab="chat" 
+              class="w-full bg-background border border-white/5 rounded-xl md:rounded-2xl p-3 md:p-5 flex items-center justify-between hover:bg-surface-container transition-all group touch-target"
+              aria-label="Open live chat"
+            >
+               <div class="flex items-center gap-3 md:gap-4">
+                 <div class="w-8 md:w-10 h-8 md:h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                   <span class="material-symbols-outlined text-lg md:text-xl" aria-hidden="true">chat_bubble</span>
+                 </div>
+                 <div class="text-left">
+                   <p class="text-xs font-bold uppercase tracking-widest text-on-surface">Live Chat</p>
+                   <p class="text-[10px] font-medium text-on-surface-variant/60 truncate max-w-[120px] md:max-w-[150px]" id="lastChatMessage">No messages yet...</p>
+                 </div>
+               </div>
+               <span class="material-symbols-outlined text-on-surface-variant/20 group-hover:text-primary group-hover:translate-x-1 transition-all" aria-hidden="true">chevron_right</span>
+             </button>
+          </section>
+        </div>
+      `;
+    }
+
     return `
       <div class="flex flex-col h-full bg-black relative group">
         <!-- Netflix-style Video Stage -->
@@ -370,6 +444,14 @@ export const RoomUI = {
                 </div>
                 <div class="flex items-center gap-2 md:gap-4">
                    <button 
+                    id="btnReaction" 
+                    data-reaction-trigger="true"
+                    class="touch-target flex items-center justify-center text-white/60 hover:text-primary transition-colors"
+                    aria-label="Send emoji reaction"
+                  >
+                    <span class="material-symbols-outlined text-xl md:text-2xl" aria-hidden="true">mood</span>
+                  </button>
+                   <button 
                     id="btnFullscreen" 
                     class="touch-target flex items-center justify-center text-white/60 hover:text-primary transition-colors"
                     aria-label="Toggle fullscreen"
@@ -462,22 +544,23 @@ export const RoomUI = {
         <div id="participantGrid" class="space-y-2 md:space-y-3 flex-1 overflow-y-auto no-scrollbar" role="list" aria-label="Participants">
           ${participants.map(p => `
             <div 
-              class="bg-black/20 p-3 md:p-4 rounded-xl md:rounded-2xl flex items-center justify-between border border-white/5 group hover:bg-white/5 transition-colors"
+              class="bg-black/20 p-3 md:p-4 rounded-xl md:rounded-2xl flex items-center justify-between border border-white/5 group hover:bg-white/5 transition-colors avatar-enter"
               role="listitem"
               aria-label="${escapeHtml(p.displayName)}${p.isHost ? ', Host' : ''}${p.userId === userId || p.id === userId ? ', You' : ''}"
             >
               <div class="flex items-center gap-3 md:gap-4">
                 <div class="relative">
-                  <div class="w-10 md:w-12 h-10 md:h-12 rounded-full bg-surface-container-high flex items-center justify-center text-lg md:text-xl font-black text-primary border-2 border-white/5 transition-all">
+                  <div class="w-10 md:w-12 h-10 md:h-12 rounded-full bg-surface-container-high flex items-center justify-center text-lg md:text-xl font-black text-primary border-2 transition-all ${p.isSpeaking ? 'speaking-pulse border-tertiary' : 'border-white/5'}">
                     ${escapeHtml(p.displayName.charAt(0))}
                   </div>
+                  ${p.isSpeaking ? '<div class="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-tertiary rounded-full animate-pulse"></div>' : ''}
                 </div>
                 <div>
                   <p class="font-bold text-xs md:text-sm text-on-surface tracking-tight">
                     ${escapeHtml(p.displayName)}${p.userId === userId || p.id === userId ? ' <span class="text-primary/60">(You)</span>' : ''}
                   </p>
                   <p class="text-[8px] md:text-[8px] font-bold uppercase tracking-[0.2em] text-on-surface-variant/60 mt-0.5">
-                    ${p.isHost ? 'Commander' : 'Crew Member'}
+                    ${p.isSpeaking ? 'Speaking...' : p.isHost ? 'Commander' : 'Crew Member'}
                   </p>
                 </div>
               </div>
@@ -764,6 +847,32 @@ export const RoomUI = {
       };
     }
 
+    const btnCopyCode = document.querySelector('#btnCopyRoomCode');
+    if (btnCopyCode) {
+      btnCopyCode.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(roomId);
+          const icon = btnCopyCode.querySelector('.material-symbols-outlined');
+          if (icon) {
+            icon.textContent = 'check';
+            btnCopyCode.classList.add('text-tertiary');
+            setTimeout(() => {
+              icon.textContent = 'content_copy';
+              btnCopyCode.classList.remove('text-tertiary');
+            }, 1500);
+          }
+        } catch {
+          // Fallback for older browsers
+          const textArea = document.createElement('textarea');
+          textArea.value = roomId;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+        }
+      };
+    }
+
     const btnSettings = document.querySelector('#btnOpenSettings');
     if (btnSettings) {
       btnSettings.onclick = () => {
@@ -861,6 +970,16 @@ export const RoomUI = {
           stage.requestFullscreen().catch(console.error);
         } else {
           document.exitFullscreen();
+        }
+      };
+    }
+
+    const btnReaction = document.querySelector('#btnReaction');
+    if (btnReaction) {
+      btnReaction.onclick = (e) => {
+        e.stopPropagation();
+        if (roomManager.onReactionToggle) {
+          roomManager.onReactionToggle();
         }
       };
     }

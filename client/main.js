@@ -4,9 +4,15 @@ import { storage } from './utils/storage';
 import { RoomManager } from './core/RoomManager';
 import { LandingUI } from './ui/LandingUI';
 import { RoomUI } from './ui/RoomUI';
+import { ToastManager } from './utils/ToastManager';
+import { ReactionManager } from './utils/ReactionManager';
 
 const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
 const app = document.querySelector('#app');
+
+// Global managers
+const toastManager = new ToastManager();
+let reactionManager = null;
 
 // Initialization
 let userId = storage.getUserId();
@@ -46,7 +52,7 @@ const render = () => {
     console.log('[render] Rendering, hasEnteredTheater:', hasEnteredTheater, 'currentSource:', currentSource);
     
     // Render the new HTML
-    app.innerHTML = RoomUI.render(roomId, roomManager.participants, userId, currentSource, currentSourceValue, hasEnteredTheater);
+    app.innerHTML = RoomUI.render(roomId, roomManager.participants, userId, currentSource, currentSourceValue, hasEnteredTheater, roomManager.isReconnecting);
     
     const container = document.getElementById('video-container');
     const lobbyView = document.querySelector('[data-lobby]');
@@ -135,6 +141,54 @@ const render = () => {
     
     roomManager.onChatMessage = (userId, displayName, message, timestamp, isMe) => {
       RoomUI.addChatMessage(userId, displayName, message, timestamp, isMe);
+    };
+
+    roomManager.onConnectionChange = (isReconnecting) => {
+      if (isReconnecting) {
+        toastManager.show('Reconnecting...', { type: 'warning', duration: 0 });
+      } else {
+        toastManager.dismissAll();
+        toastManager.show('Reconnected', { type: 'success', duration: 2000 });
+      }
+      render();
+    };
+
+    roomManager.onUserJoined = (user) => {
+      if (user.userId === roomManager.userId) return;
+      toastManager.show(`${user.displayName} joined`, { type: 'user', icon: 'person_add' });
+    };
+
+    roomManager.onUserLeft = (user) => {
+      if (!user || user.userId === roomManager.userId) return;
+      toastManager.show(`${user.displayName} left`, { type: 'info', icon: 'person_off' });
+    };
+
+    // Reaction manager
+    if (!reactionManager) {
+      reactionManager = new ReactionManager('video-stage', (emojiId) => {
+        roomManager.sendReaction(emojiId);
+      });
+    }
+
+    roomManager.onReactionToggle = () => {
+      reactionManager.toggle();
+    };
+
+    roomManager.onReaction = (data) => {
+      reactionManager.handleRemoteReaction(data);
+    };
+
+    roomManager.onSpeakingChange = () => {
+      // Update speaking indicators without full re-render
+      const peoplePanel = document.getElementById('people-panel');
+      if (peoplePanel && RoomUI.currentTab === 'people') {
+        peoplePanel.innerHTML = RoomUI.renderPeopleView(roomManager.participants, userId);
+      }
+      // Also update desktop sidebar if visible
+      const chatPanel = document.getElementById('chat-panel');
+      if (chatPanel && RoomUI.currentTab === 'chat') {
+        // Speaking indicators only in people panel, skip
+      }
     };
 
     if (!roomManager.roomId) {

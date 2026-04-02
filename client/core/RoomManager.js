@@ -15,8 +15,10 @@ export class RoomManager {
     this.roomId = null;
     this.participants = [];
     this.onStateChange = null;
+    this.onConnectionChange = null;
     this._pendingScreenStream = null;
     this.hasEnteredTheater = false;
+    this.isReconnecting = false;
 
     this.setupListeners();
     this.setupPeerManagerCallbacks();
@@ -74,6 +76,34 @@ export class RoomManager {
   setupListeners() {
     this.socket.on('connect', () => {
       console.log(`[RoomManager] Connected: ${this.socket.id}`);
+      this.isReconnecting = false;
+      if (this.onConnectionChange) {
+        this.onConnectionChange(false);
+      }
+      // Re-join room on reconnect
+      if (this.roomId) {
+        this.socket.emit('join-room', {
+          roomId: this.roomId,
+          userId: this.userId,
+          displayName: this.displayName
+        });
+      }
+    });
+
+    this.socket.on('disconnect', (reason) => {
+      console.log(`[RoomManager] Disconnected: ${reason}`);
+      this.isReconnecting = true;
+      if (this.onConnectionChange) {
+        this.onConnectionChange(true);
+      }
+    });
+
+    this.socket.on('connect_error', (err) => {
+      console.error(`[RoomManager] Connection error: ${err.message}`);
+      this.isReconnecting = true;
+      if (this.onConnectionChange) {
+        this.onConnectionChange(true);
+      }
     });
 
     this.socket.on('room-state', (state) => {
@@ -128,17 +158,24 @@ export class RoomManager {
           }
         }
 
+        if (this.onUserJoined) {
+          this.onUserJoined(user);
+        }
         if (this.onStateChange) this.onStateChange(this.participants);
       }
     });
 
     this.socket.on('user-left', (leftUserId) => {
       console.log(`[RoomManager] User left: ${leftUserId}`);
+      const leftUser = this.participants.find(p => p.userId === leftUserId);
       this.participants = this.participants.filter(p => p.userId !== leftUserId);
       
       // Clean up peer connection
       this.peerManager.removeCallReference(leftUserId, 'screen');
 
+      if (this.onUserLeft) {
+        this.onUserLeft(leftUser);
+      }
       if (this.onStateChange) this.onStateChange(this.participants);
     });
 
@@ -167,6 +204,16 @@ export class RoomManager {
       if (user) {
         user.displayName = displayName;
         if (this.onStateChange) this.onStateChange(this.participants);
+      }
+    });
+
+    this.socket.on('user-speaking', ({ userId, isSpeaking }) => {
+      const user = this.participants.find(p => p.userId === userId || p.id === userId);
+      if (user) {
+        user.isSpeaking = isSpeaking;
+        if (this.onSpeakingChange) {
+          this.onSpeakingChange(userId, isSpeaking);
+        }
       }
     });
 

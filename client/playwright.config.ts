@@ -1,4 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
+import path from 'path';
+import os from 'os';
+
+const playwrightCache = path.join(os.homedir(), 'AppData', 'Local', 'ms-playwright');
 
 export default defineConfig({
   testDir: './e2e',
@@ -14,7 +18,11 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: { 
+        ...devices['Desktop Chrome'],
+        channel: 'chromium',
+        executablePath: path.join(playwrightCache, 'chromium-1217', 'chrome-win64', 'chrome.exe'),
+      },
     },
   ],
   webServer: {

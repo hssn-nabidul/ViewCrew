@@ -116,6 +116,13 @@ router.post('/', async (req: Request, res: Response) => {
       res.status(400).json(error);
       return;
     }
+
+    const sanitizedName = hostName.trim().substring(0, 30);
+    if (sanitizedName.length === 0) {
+      const error: ApiError = { error: 'VALIDATION_ERROR', message: 'hostName must contain valid characters' };
+      res.status(400).json(error);
+      return;
+    }
     
     const roomId = await findAvailableRoomId();
     const hostToken = generateHostToken();
@@ -124,7 +131,7 @@ router.post('/', async (req: Request, res: Response) => {
     const hostParticipant: Participant = {
       id: hostId,
       socketId: '',
-      displayName: hostName.trim(),
+      displayName: sanitizedName,
       joinedAt: new Date(),
       isHost: true
     };
@@ -190,6 +197,12 @@ router.post('/:id/join', (req: Request, res: Response) => {
     res.status(400).json({ error: 'VALIDATION_ERROR', message: 'participantName is required' });
     return;
   }
+
+  const sanitizedName = participantName.trim().substring(0, 30);
+  if (sanitizedName.length === 0) {
+    res.status(400).json({ error: 'VALIDATION_ERROR', message: 'participantName must contain valid characters' });
+    return;
+  }
   
   const room = rooms.get(id.toUpperCase());
   
@@ -203,7 +216,7 @@ router.post('/:id/join', (req: Request, res: Response) => {
     const existingParticipant = room.participants.get(existingParticipantId);
     if (existingParticipant) {
       // Update display name if changed
-      existingParticipant.displayName = participantName.trim();
+      existingParticipant.displayName = sanitizedName;
       existingParticipant.socketId = '';
       
       const response: JoinRoomResponse = {
@@ -233,7 +246,7 @@ router.post('/:id/join', (req: Request, res: Response) => {
   const participant: Participant = {
     id: participantId,
     socketId: '',
-    displayName: participantName.trim(),
+    displayName: sanitizedName,
     joinedAt: new Date(),
     isHost: false
   };

@@ -7,9 +7,18 @@ import { RoomUI } from './ui/RoomUI';
 import { ToastManager } from './utils/ToastManager';
 import { ReactionManager } from './utils/ReactionManager';
 import { ErrorBoundary } from './utils/ErrorBoundary';
+import { ErrorReporter } from './utils/ErrorReporter';
 
 const errorBoundary = new ErrorBoundary();
 errorBoundary.init();
+
+const errorReporter = new ErrorReporter();
+window.addEventListener('error', (e) => {
+  errorReporter.captureException(e.error || new Error(e.message), { filename: e.filename, line: e.lineno });
+});
+window.addEventListener('unhandledrejection', (e) => {
+  errorReporter.captureException(e.reason instanceof Error ? e.reason : new Error(String(e.reason)), 'error');
+});
 
 const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
 const app = document.querySelector('#app');
@@ -196,7 +205,7 @@ const render = () => {
     };
 
     if (!roomManager.roomId) {
-      roomManager.joinRoom(roomId, userId);
+      roomManager.joinRoom(roomId, userId, storage.getHostToken());
     }
   } else {
     app.innerHTML = LandingUI.render(displayName);
@@ -212,9 +221,10 @@ const render = () => {
         storage.setDisplayName(finalName);
         try {
           const data = await roomManager.createRoom(finalName);
-          if (data.roomId && data.participantId) {
+          if (data.roomId && data.participantId && data.hostToken) {
             userId = data.participantId;
             storage.setUserId(userId);
+            storage.setHostToken(data.hostToken);
             window.location.href = `?room=${data.roomId}`;
           }
         } catch (err) {

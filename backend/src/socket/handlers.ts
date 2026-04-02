@@ -62,7 +62,7 @@ export function setupSocketHandlers(io: Server): void {
     socket.data = socketData;
 
     // join-room: Join a room namespace
-    socket.on('join-room', async (data: { roomId: string; userId: string; displayName: string }) => {
+    socket.on('join-room', async (data: { roomId: string; userId: string; displayName: string; hostToken?: string }) => {
       try {
         if (!checkRateLimit(socket, generalLimiter, 'join-room')) return;
 
@@ -96,6 +96,15 @@ export function setupSocketHandlers(io: Server): void {
         if (!participant) {
           socket.emit('error', { code: 'PARTICIPANT_NOT_FOUND', message: 'Participant not found' });
           return;
+        }
+
+        // If joining as host, validate host token
+        if (participant.isHost) {
+          const hostToken = data?.hostToken;
+          if (!hostToken || hostToken !== room.hostToken) {
+            socket.emit('error', { code: 'UNAUTHORIZED', message: 'Invalid host token' });
+            return;
+          }
         }
         
         // Update participant socket ID and display name

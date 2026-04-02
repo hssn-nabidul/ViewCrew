@@ -1,5 +1,6 @@
 const USER_ID_KEY = 'watchsync-userId';
 const DISPLAY_NAME_KEY = 'watchsync-displayName';
+const HOST_TOKEN_KEY = 'watchsync-hostToken';
 
 export const storage = {
   getUserId: () => {
@@ -18,5 +19,14 @@ export const storage = {
   },
   setDisplayName: (name) => {
     localStorage.setItem(DISPLAY_NAME_KEY, name);
+  },
+  getHostToken: () => {
+    return localStorage.getItem(HOST_TOKEN_KEY) || null;
+  },
+  setHostToken: (token) => {
+    localStorage.setItem(HOST_TOKEN_KEY, token);
+  },
+  clearHostToken: () => {
+    localStorage.removeItem(HOST_TOKEN_KEY);
   }
 };

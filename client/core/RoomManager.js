@@ -13,6 +13,7 @@ export class RoomManager {
     this.syncEngine = null;
     this.screenShare = new ScreenShare();
     this.roomId = null;
+    this.hostToken = null;
     this.participants = [];
     this.onStateChange = null;
     this.onConnectionChange = null;
@@ -86,7 +87,8 @@ export class RoomManager {
         this.socket.emit('join-room', {
           roomId: this.roomId,
           userId: this.userId,
-          displayName: this.displayName
+          displayName: this.displayName,
+          hostToken: this.hostToken
         });
       }
     });
@@ -244,13 +246,15 @@ export class RoomManager {
     }
   }
 
-  joinRoom(roomId, participantId) {
+  joinRoom(roomId, participantId, hostToken) {
     this.roomId = roomId;
     if (participantId) this.userId = participantId;
+    if (hostToken) this.hostToken = hostToken;
     this.socket.emit('join-room', {
       roomId: this.roomId,
       userId: this.userId,
-      displayName: this.displayName
+      displayName: this.displayName,
+      hostToken: this.hostToken
     });
   }
 

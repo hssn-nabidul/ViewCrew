@@ -7,6 +7,7 @@ import path from 'path';
 import fs from 'fs';
 import rateLimit from 'express-rate-limit';
 import { ExpressPeerServer } from 'peer';
+import helmet from 'helmet';
 import roomsRouter from './routes/rooms';
 import { setupSocketHandlers } from './socket/handlers';
 
@@ -53,6 +54,23 @@ const io = new Server(httpServer, {
 });
 
 // Middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://www.youtube.com", "https://s.ytimg.com"],
+      frameSrc: ["'self'", "https://www.youtube.com", "https://www.youtube-nocookie.com"],
+      connectSrc: ["'self'", "wss:", "ws:", "https:"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      mediaSrc: ["'self'", "blob:", "https://www.youtube.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+    }
+  },
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+
 app.use(cors({
   origin: corsOrigins,
   credentials: true
@@ -75,7 +93,14 @@ const roomLimiter = rateLimit({
 
 app.use('/api/', apiLimiter);
 app.use('/api/rooms', roomLimiter);
-app.use('/peerjs', peerServer);
+
+// Rate limiting for PeerJS signaling endpoint
+const peerLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  message: { error: 'Too many signaling requests, please slow down.' }
+});
+app.use('/peerjs', peerLimiter, peerServer);
 
 // API Routes
 app.use('/api/rooms', roomsRouter);

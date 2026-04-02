@@ -1,15 +1,39 @@
-import express, { Request, Response } from 'express';
-import { createServer } from 'http';
+import express, { Request, Response, NextFunction } from 'express';
+import { createServer, Server as HttpServer } from 'http';
+import { createServer as createHttpsServer, Server as HttpsServer } from 'https';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import rateLimit from 'express-rate-limit';
 import { ExpressPeerServer } from 'peer';
 import roomsRouter from './routes/rooms';
 import { setupSocketHandlers } from './socket/handlers';
 
 const app = express();
-const httpServer = createServer(app);
+
+// HTTPS support for production (optional, controlled by env vars)
+const useHttps = process.env.USE_HTTPS === 'true';
+const httpsCertPath = process.env.HTTPS_CERT_PATH;
+const httpsKeyPath = process.env.HTTPS_KEY_PATH;
+
+let httpServer: HttpServer | HttpsServer;
+
+if (useHttps && httpsCertPath && httpsKeyPath) {
+  try {
+    const httpsOptions = {
+      cert: fs.readFileSync(httpsCertPath),
+      key: fs.readFileSync(httpsKeyPath)
+    };
+    httpServer = createHttpsServer(httpsOptions, app);
+    console.log('[Server] HTTPS mode enabled');
+  } catch (err) {
+    console.error('[Server] Failed to load HTTPS certs, falling back to HTTP:', err);
+    httpServer = createServer(app);
+  }
+} else {
+  httpServer = createServer(app);
+}
 
 const peerServer = ExpressPeerServer(httpServer, {
   path: '/'
@@ -72,7 +96,7 @@ setupSocketHandlers(io);
 
 // Start server
 const PORT = process.env.PORT || 3000;
-
+const protocol = useHttps ? 'https' : 'http';
 
 httpServer.listen(PORT, () => {
   console.log(`
@@ -80,9 +104,9 @@ httpServer.listen(PORT, () => {
 ║                                                           ║
 ║   🎬 CineSync Backend Server                              ║
 ║                                                           ║
-║   HTTP:      http://localhost:${PORT}                      ║
-║   WebSocket: ws://localhost:${PORT}                        ║
-║   Health:    http://localhost:${PORT}/health               ║
+║   ${protocol.toUpperCase()}:      ${protocol}://localhost:${PORT}                      ║
+║   WebSocket: ${protocol === 'https' ? 'wss' : 'ws'}://localhost:${PORT}                        ║
+║   Health:    ${protocol}://localhost:${PORT}/health               ║
 ║                                                           ║
 ║   Room API:                                              ║
 ║   - POST   /api/rooms         - Create room              ║
@@ -109,5 +133,20 @@ const shutdown = () => {
 
 process.on('SIGTERM', shutdown);
 process.on('SIGINT', shutdown);
+
+// Global unhandled error handlers
+process.on('unhandledRejection', (reason: unknown) => {
+  console.error('[Server] Unhandled Promise Rejection:', reason);
+});
+
+process.on('uncaughtException', (error: Error) => {
+  console.error('[Server] Uncaught Exception:', error);
+});
+
+// Global Express error handler (must be after all routes)
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('[Server] Global error handler:', err);
+  res.status(500).json({ error: 'INTERNAL_ERROR', message: 'An unexpected error occurred' });
+});
 
 export { app, io };

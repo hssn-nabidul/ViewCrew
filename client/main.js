@@ -6,6 +6,10 @@ import { LandingUI } from './ui/LandingUI';
 import { RoomUI } from './ui/RoomUI';
 import { ToastManager } from './utils/ToastManager';
 import { ReactionManager } from './utils/ReactionManager';
+import { ErrorBoundary } from './utils/ErrorBoundary';
+
+const errorBoundary = new ErrorBoundary();
+errorBoundary.init();
 
 const API_URL = import.meta.env.VITE_API_URL || window.location.origin;
 const app = document.querySelector('#app');

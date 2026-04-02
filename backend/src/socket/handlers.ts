@@ -1,6 +1,16 @@
 import { Server, Socket } from 'socket.io';
 import { Room, Participant } from '../models/room';
 import { rooms, getRoom } from '../routes/rooms';
+import { createRateLimiter, SocketRateLimiter } from '../middleware/rateLimiter';
+import {
+  validateRoomId,
+  validateDisplayName,
+  validateChatMessage,
+  validateSyncType,
+  validateEmojiId,
+  validateTime,
+  validateUserId,
+} from '../middleware/validation';
 
 // Socket data stored per connection
 interface SocketData {
@@ -19,6 +29,33 @@ const CHAT_RATE_LIMIT_WINDOW = 10; // Max 10 messages
 const chatMessageCount = new Map<string, number>();
 const chatMessageWindow = new Map<string, number>();
 
+// Socket event rate limiters
+const syncLimiter = createRateLimiter({ maxEvents: 10, windowMs: 1000, blockMs: 5000 });
+const reactionLimiter = createRateLimiter({ maxEvents: 5, windowMs: 1000, blockMs: 3000 });
+const signalingLimiter = createRateLimiter({ maxEvents: 20, windowMs: 1000, blockMs: 5000 });
+const generalLimiter = createRateLimiter({ maxEvents: 15, windowMs: 1000, blockMs: 3000 });
+
+// Cleanup stale rate limiter entries every 60s
+setInterval(() => {
+  syncLimiter.cleanup();
+  reactionLimiter.cleanup();
+  signalingLimiter.cleanup();
+  generalLimiter.cleanup();
+}, 60000);
+
+function checkRateLimit(socket: Socket, limiter: SocketRateLimiter, eventName: string): boolean {
+  const result = limiter.allow(socket.id);
+  if (!result.allowed) {
+    socket.emit('error', {
+      code: 'RATE_LIMITED',
+      message: `${eventName} rate exceeded`,
+      retryAfter: result.retryAfter
+    });
+    return false;
+  }
+  return true;
+}
+
 export function setupSocketHandlers(io: Server): void {
   io.on('connection', (socket: Socket) => {
     console.log(`[Socket] Client connected: ${socket.id}`);
@@ -29,11 +66,28 @@ export function setupSocketHandlers(io: Server): void {
     // join-room: Join a room namespace
     socket.on('join-room', async (data: { roomId: string; userId: string; displayName: string }) => {
       try {
-        const { roomId, userId } = data;
-        const normalizedRoomId = roomId.toUpperCase();
+        if (!checkRateLimit(socket, generalLimiter, 'join-room')) return;
+
+        const roomId = validateRoomId(data?.roomId);
+        if (!roomId) {
+          socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid room ID' });
+          return;
+        }
+
+        const userId = validateUserId(data?.userId);
+        if (!userId) {
+          socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid user ID' });
+          return;
+        }
+
+        const displayName = validateDisplayName(data?.displayName);
+        if (!displayName) {
+          socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid display name' });
+          return;
+        }
         
         // Validate room exists
-        const room = getRoom(normalizedRoomId);
+        const room = getRoom(roomId);
         if (!room || !room.isActive) {
           socket.emit('error', { code: 'ROOM_NOT_FOUND', message: 'Room not found' });
           return;
@@ -46,28 +100,29 @@ export function setupSocketHandlers(io: Server): void {
           return;
         }
         
-        // Update participant socket ID
+        // Update participant socket ID and display name
         participant.socketId = socket.id;
+        participant.displayName = displayName;
         
         // Join socket to room
-        await socket.join(normalizedRoomId);
+        await socket.join(roomId);
         
         // Track socket -> room mapping
-        socketData.roomId = normalizedRoomId;
+        socketData.roomId = roomId;
         socketData.userId = userId;
-        socketData.displayName = participant.displayName;
-        socketToRoom.set(socket.id, { roomId: normalizedRoomId, userId });
+        socketData.displayName = displayName;
+        socketToRoom.set(socket.id, { roomId, userId });
         
         // Notify other participants
-        socket.to(normalizedRoomId).emit('user-joined', {
+        socket.to(roomId).emit('user-joined', {
           userId,
-          displayName: participant.displayName,
+          displayName,
           isHost: participant.isHost
         });
         
         // Send current participants to joining user
         socket.emit('room-state', {
-          roomId: normalizedRoomId,
+          roomId,
           hostId: room.hostId,
           isScreenSharing: room.isScreenSharing,
           screenSharingUserId: room.screenSharingUserId,
@@ -82,7 +137,7 @@ export function setupSocketHandlers(io: Server): void {
           }))
         });
         
-        console.log(`[Socket] ${participant.displayName} joined room ${normalizedRoomId}`);
+        console.log(`[Socket] ${displayName} joined room ${roomId}`);
       } catch (error) {
         console.error('[Socket] Error joining room:', error);
         socket.emit('error', { code: 'SERVER_ERROR', message: 'Failed to join room' });
@@ -92,11 +147,23 @@ export function setupSocketHandlers(io: Server): void {
     // leave-room: Leave current room
     socket.on('leave-room', async (data: { roomId: string; userId: string }) => {
       try {
-        const { roomId, userId } = data;
-        await handleLeaveRoom(io, socket, roomId.toUpperCase(), userId);
+        if (!checkRateLimit(socket, generalLimiter, 'leave-room')) return;
+
+        const roomId = validateRoomId(data?.roomId);
+        if (!roomId) {
+          socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid room ID' });
+          return;
+        }
+
+        const userId = validateUserId(data?.userId);
+        if (!userId) {
+          socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid user ID' });
+          return;
+        }
+
+        await handleLeaveRoom(io, socket, roomId, userId);
       } catch (error) {
         console.error('[Socket] Error leaving room:', error);
-        // Ensure socketToRoom is cleaned up even on error
         socketToRoom.delete(socket.id);
         socket.emit('error', { code: 'LEAVE_FAILED', message: 'Failed to leave room' });
       }
@@ -104,27 +171,51 @@ export function setupSocketHandlers(io: Server): void {
 
     // WebRTC Signaling handlers
     socket.on('user-speaking', (data: { roomId: string; userId: string; isSpeaking: boolean }) => {
+      if (!checkRateLimit(socket, generalLimiter, 'user-speaking')) return;
       const { roomId, userId, isSpeaking } = data;
       socket.to(roomId.toUpperCase()).emit('user-speaking', { userId, isSpeaking });
     });
 
     socket.on('offer', (data: { targetId: string; offer: any; callerId: string }) => {
+      if (!checkRateLimit(socket, signalingLimiter, 'offer')) return;
       relayToUser(io, socketData.roomId, data.targetId, 'offer', data);
     });
 
     socket.on('answer', (data: { targetId: string; answer: any; callerId: string }) => {
+      if (!checkRateLimit(socket, signalingLimiter, 'answer')) return;
       relayToUser(io, socketData.roomId, data.targetId, 'answer', data);
     });
 
     socket.on('ice-candidate', (data: { targetId: string; candidate: any; senderId: string }) => {
+      if (!checkRateLimit(socket, signalingLimiter, 'ice-candidate')) return;
       relayToUser(io, socketData.roomId, data.targetId, 'ice-candidate', data);
     });
 
 
     // sync-event: Relay playback control from host to viewers
     socket.on('sync-event', (data: { roomId: string; type: string; time: number; source?: string; sourceValue?: string }) => {
+      if (!checkRateLimit(socket, syncLimiter, 'sync-event')) return;
       const { roomId, ...payload } = data;
-      const normalizedRoomId = roomId.toUpperCase();
+      const normalizedRoomId = validateRoomId(roomId);
+      if (!normalizedRoomId) {
+        socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid room ID' });
+        return;
+      }
+      
+      const syncType = validateSyncType(payload.type);
+      if (!syncType) {
+        socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid sync event type' });
+        return;
+      }
+      
+      if (payload.time !== undefined) {
+        const validTime = validateTime(payload.time);
+        if (validTime === null) {
+          socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid time value' });
+          return;
+        }
+        payload.time = validTime;
+      }
       
       const room = getRoom(normalizedRoomId);
       if (!room) {
@@ -137,7 +228,7 @@ export function setupSocketHandlers(io: Server): void {
         return;
       }
       
-      if (payload.type === 'source-change') {
+      if (syncType === 'source-change') {
         room.isScreenSharing = payload.source === 'screen';
         room.screenSharingUserId = room.isScreenSharing ? payload.sourceValue : undefined;
         room.currentSource = payload.source;
@@ -148,9 +239,9 @@ export function setupSocketHandlers(io: Server): void {
         room.currentTime = payload.time;
       }
       
-      if (payload.type === 'play') {
+      if (syncType === 'play') {
         room.isPlaying = true;
-      } else if (payload.type === 'pause') {
+      } else if (syncType === 'pause') {
         room.isPlaying = false;
       }
 
@@ -159,6 +250,7 @@ export function setupSocketHandlers(io: Server): void {
 
     // request-screen: Late joiner requests screen stream from host
     socket.on('request-screen', (data: { roomId: string }) => {
+      if (!checkRateLimit(socket, generalLimiter, 'request-screen')) return;
       const normalizedRoomId = (data.roomId || socketData.roomId)?.toUpperCase();
       if (!normalizedRoomId) return;
       
@@ -176,22 +268,37 @@ export function setupSocketHandlers(io: Server): void {
     });
 
     socket.on('update-display-name', (data: { roomId: string; userId: string; displayName: string }) => {
-      const { roomId, userId, displayName } = data;
-      const normalizedRoomId = roomId.toUpperCase();
-      const room = getRoom(normalizedRoomId);
+      if (!checkRateLimit(socket, generalLimiter, 'update-display-name')) return;
+      const roomId = validateRoomId(data?.roomId);
+      if (!roomId) {
+        socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid room ID' });
+        return;
+      }
+
+      const userId = validateUserId(data?.userId);
+      if (!userId) {
+        socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid user ID' });
+        return;
+      }
+
+      const displayName = validateDisplayName(data?.displayName);
+      if (!displayName) {
+        socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid display name' });
+        return;
+      }
       
       if (socketData.userId !== userId) {
         socket.emit('error', { code: 'UNAUTHORIZED', message: 'Cannot update another user\'s name' });
         return;
       }
       
+      const room = getRoom(roomId);
       if (room) {
         const participant = room.participants.get(userId);
         if (participant) {
-          const sanitizedName = String(displayName).trim().substring(0, 30);
-          participant.displayName = sanitizedName;
-          socketData.displayName = sanitizedName;
-          io.to(normalizedRoomId).emit('display-name-updated', { userId, displayName: sanitizedName });
+          participant.displayName = displayName;
+          socketData.displayName = displayName;
+          io.to(roomId).emit('display-name-updated', { userId, displayName });
         }
       }
     });
@@ -212,7 +319,6 @@ export function setupSocketHandlers(io: Server): void {
       // Track message count in current window
       const windowStart = chatMessageWindow.get(socket.id) || 0;
       if (now - windowStart > 60000) {
-        // Reset window after 1 minute
         chatMessageCount.set(socket.id, 1);
         chatMessageWindow.set(socket.id, now);
       } else {
@@ -226,8 +332,8 @@ export function setupSocketHandlers(io: Server): void {
       chatRateLimit.set(socket.id, now);
       
       // Validate and sanitize message
-      const message = data.message?.trim().substring(0, 500) || '';
-      if (message.length === 0) return;
+      const message = validateChatMessage(data?.message);
+      if (!message) return;
 
       io.to(roomId).emit('chat-message', {
         userId: socketData.userId,
@@ -239,13 +345,20 @@ export function setupSocketHandlers(io: Server): void {
 
     // send-reaction: Broadcast emoji reaction to room
     socket.on('send-reaction', (data: { emojiId: string }) => {
+      if (!checkRateLimit(socket, reactionLimiter, 'send-reaction')) return;
       const roomId = socketData.roomId;
       if (!roomId || !socketData.userId) return;
+
+      const emojiId = validateEmojiId(data?.emojiId);
+      if (!emojiId) {
+        socket.emit('error', { code: 'INVALID_INPUT', message: 'Invalid emoji ID' });
+        return;
+      }
 
       io.to(roomId).emit('new-reaction', {
         userId: socketData.userId,
         displayName: socketData.displayName,
-        emojiId: data.emojiId
+        emojiId
       });
     });
 
@@ -259,6 +372,10 @@ export function setupSocketHandlers(io: Server): void {
       chatRateLimit.delete(socket.id);
       chatMessageCount.delete(socket.id);
       chatMessageWindow.delete(socket.id);
+      syncLimiter.reset(socket.id);
+      reactionLimiter.reset(socket.id);
+      signalingLimiter.reset(socket.id);
+      generalLimiter.reset(socket.id);
     });
   });
 }

@@ -32,6 +32,41 @@ jobs:
       - name: Test
         run: npm test
 
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install client dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Install backend dependencies
+        run: cd ../backend && npm ci
+
+      - name: Start backend server
+        run: cd ../backend && npm run dev &
+        env:
+          PORT: 3000
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+        env:
+          CI: true
+
   backend:
     name: Backend — Build
     runs-on: ubuntu-latest

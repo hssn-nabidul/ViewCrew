@@ -7,8 +7,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "inter-ui": "^3.19.3",

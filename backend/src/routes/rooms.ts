@@ -10,12 +10,14 @@ const rooms = new Map<string, Room>();
 // Max participants per room
 const MAX_PARTICIPANTS = 4;
 
-// Generate 6-char alphanumeric room ID
+// Generate 6-char alphanumeric room ID using crypto
 function generateRoomId(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
   let result = '';
   for (let i = 0; i < 6; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    result += chars.charAt(bytes[i] % chars.length);
   }
   return result;
 }
@@ -359,5 +361,5 @@ router.get('/:id/participants', (req: Request, res: Response) => {
 });
 
 // Export for use by other modules
-export { rooms, MAX_PARTICIPANTS };
+export { MAX_PARTICIPANTS };
 export default router;

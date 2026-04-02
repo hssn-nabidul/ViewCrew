@@ -112,6 +112,8 @@ export class HTMLVideoPlayer extends PlayerInterface {
   isPaused() { return this.video ? this.video.paused : true; }
   setVolume(volume) { if (this.video) this.video.volume = volume; }
   destroy() { 
+    const overlay = document.getElementById('play-overlay-local');
+    if (overlay) overlay.remove();
     if (this.video) {
       this.video.pause();
       this.video.removeAttribute('src');

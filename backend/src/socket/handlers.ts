@@ -1,6 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { Room, Participant } from '../models/room';
-import { rooms, getRoom } from '../routes/rooms';
+import { getRoom } from '../routes/rooms';
 import { createRateLimiter, SocketRateLimiter } from '../middleware/rateLimiter';
 import {
   validateRoomId,

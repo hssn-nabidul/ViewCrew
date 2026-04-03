@@ -372,9 +372,21 @@ export class RoomManager {
         return;
       }
 
+      // Save original display styles
+      const originalStyle = videoElement.style.cssText;
+      
+      // Temporarily set video element to native resolution for high-quality capture
+      videoElement.style.cssText = `position:fixed;top:0;left:0;width:${videoElement.videoWidth}px;height:${videoElement.videoHeight}px;opacity:0;pointer-events:none;z-index:-1;`;
+      
+      // Force reflow so browser applies the new size before capture
+      void videoElement.offsetHeight;
+      
       const rawStream = videoElement.captureStream
         ? videoElement.captureStream()
         : (videoElement.mozCaptureStream ? videoElement.mozCaptureStream() : null);
+
+      // Restore original display styles
+      videoElement.style.cssText = originalStyle;
 
       if (!rawStream) {
         console.warn('[RoomManager] Browser does not support captureStream');

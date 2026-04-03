@@ -17,8 +17,8 @@ export class ScreenPlayer extends PlayerInterface {
 
       // --- MOBILE PLAYBACK FLAGS ---
       this.video.autoplay = true;
-      this.video.muted = false; // Don't mute by default - audio comes through
-      this.video.controls = false;
+      this.video.muted = false;
+      this.video.controls = true;
       this.video.playsInline = true;
       this.video.setAttribute('playsinline', '');
       this.video.setAttribute('webkit-playsinline', '');

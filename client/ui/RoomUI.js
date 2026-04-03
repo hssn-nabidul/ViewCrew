@@ -1117,6 +1117,8 @@ export const RoomUI = {
       inputLocal.onchange = (e) => {
         const file = e.target.files[0];
         if (file && roomManager.startFileStream) {
+          RoomUI.currentTab = 'watch';
+          render();
           roomManager.startFileStream(file);
         }
       };

@@ -92,6 +92,15 @@ export class PeerManager {
     this._cachedScreenStream = null;
   }
 
+  startScreenShare(stream, remoteUserIds) {
+    this.screenStream = stream;
+    remoteUserIds.forEach(id => {
+      if (id !== this.userId) {
+        this.callPeer(id, 'screen');
+      }
+    });
+  }
+
   destroy() {
     this.calls.forEach(calls => {
       if (calls.screen) calls.screen.close();

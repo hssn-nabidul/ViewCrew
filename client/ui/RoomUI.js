@@ -1112,6 +1112,11 @@ export const RoomUI = {
           render();
           
           roomManager.syncEngine.changeSource('local', blobUrl, roomManager.roomId);
+          
+          // Auto-start screen share so viewers can see the local file
+          setTimeout(() => {
+            roomManager.startScreenShare();
+          }, 1500);
         }
       };
     }

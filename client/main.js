@@ -90,6 +90,9 @@ const render = () => {
     
     // Re-attach player if it already existed (handles full re-renders)
     if (currentSource && roomManager.syncEngine) {
+      // Update lastSource BEFORE loadSource to prevent re-render loop
+      lastSource = currentSource;
+      
       roomManager.syncEngine.loadSource(currentSource, currentSourceValue);
       
       // If we had saved YouTube state, restore playback position

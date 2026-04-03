@@ -597,7 +597,14 @@ export class RoomManager {
         progress,
         totalChunks: this.fileStream.totalChunks
       };
-      if (this.onStateChange) this.onStateChange(this.participants);
+      const bar = document.getElementById('file-transfer-progress-bar');
+      if (bar) {
+        bar.style.width = `${Math.round(progress * 100)}%`;
+      }
+      const text = document.querySelector('#file-transfer-overlay p:last-child');
+      if (text) {
+        text.textContent = `${Math.round(progress * 100)}% received`;
+      }
     };
 
     this.fileStream.onComplete = () => {

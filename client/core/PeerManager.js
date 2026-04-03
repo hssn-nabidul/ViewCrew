@@ -135,11 +135,26 @@ export class PeerManager {
   }
 
   createDataChannelsToAll(remoteUserIds, label = 'file-stream') {
+    const promises = [];
     remoteUserIds.forEach(id => {
       if (id !== this.userId) {
-        this.createDataChannel(id, label);
+        const existing = this.dataChannels.get(id);
+        if (existing && existing.length > 0 && existing[0].open) {
+          promises.push(Promise.resolve());
+          return;
+        }
+
+        promises.push(new Promise((resolve) => {
+          const conn = this.createDataChannel(id, label);
+          if (conn.open) {
+            resolve();
+          } else {
+            conn.on('open', () => resolve());
+          }
+        }));
       }
     });
+    return Promise.all(promises);
   }
 
   sendDataToAll(data) {

@@ -186,9 +186,19 @@ export class RoomManager {
           if (this.screenShare.isActive()) {
             this.peerManager.callPeer(user.userId, 'screen');
           }
-          if (this.voiceChat.isReady) {
-            this.peerManager.callPeer(user.userId, 'voice');
-          }
+        if (this.voiceChat.isReady) {
+          this.peerManager.callPeer(user.userId, 'voice');
+        }
+
+        // If file streaming is active, stream to new joiner
+        if (this.fileStream.isStreaming && this.fileStream.file) {
+          console.log('[RoomManager] New user joined during file stream, creating DataChannel');
+          this.peerManager.createDataChannel(user.userId, 'file-stream');
+          // Re-stream file to new user after DataChannel opens
+          setTimeout(() => {
+            this._streamFileToPeer(user.userId);
+          }, 1000);
+        }
         }
 
         if (this.onUserJoined) {
@@ -625,33 +635,87 @@ export class RoomManager {
       .filter(p => p.userId !== this.userId)
       .map(p => p.userId);
 
-    this.peerManager.createDataChannelsToAll(remoteUserIds, 'file-stream');
+    if (remoteUserIds.length === 0) {
+      console.warn('[RoomManager] No remote users to stream to');
+      return;
+    }
 
-    setTimeout(() => {
-      this.fileStream.start(file, (message) => {
-        let encoded;
-        if (message.type === 'file-meta') {
-          const jsonStr = JSON.stringify(message);
-          const encoder = new TextEncoder();
-          const encoded_json = encoder.encode(jsonStr);
-          encoded = new ArrayBuffer(encoded_json.length + 1);
-          new Uint8Array(encoded)[0] = 0;
-          new Uint8Array(encoded).set(encoded_json, 1);
-        } else if (message.type === 'file-chunk') {
-          encoded = new ArrayBuffer(5 + message.data.byteLength);
-          const view = new DataView(encoded);
-          view.setUint8(0, 1);
-          view.setUint32(1, message.index);
-          new Uint8Array(encoded, 5).set(new Uint8Array(message.data));
-        } else if (message.type === 'file-end') {
-          encoded = new ArrayBuffer(1);
-          new Uint8Array(encoded)[0] = 2;
-        }
-        if (encoded) {
-          this.peerManager.sendDataToAll(encoded);
-        }
-      });
-    }, 500);
+    try {
+      await this.peerManager.createDataChannelsToAll(remoteUserIds, 'file-stream');
+      console.log('[RoomManager] All DataChannels open, starting file stream');
+    } catch (err) {
+      console.error('[RoomManager] Failed to create DataChannels:', err);
+      this.fileTransfer = null;
+      if (this.onStateChange) this.onStateChange(this.participants);
+      return;
+    }
+
+    this.fileStream.start(file, (message) => {
+      let encoded;
+      if (message.type === 'file-meta') {
+        const jsonStr = JSON.stringify(message);
+        const encoder = new TextEncoder();
+        const encoded_json = encoder.encode(jsonStr);
+        encoded = new ArrayBuffer(encoded_json.length + 1);
+        new Uint8Array(encoded)[0] = 0;
+        new Uint8Array(encoded).set(encoded_json, 1);
+      } else if (message.type === 'file-chunk') {
+        encoded = new ArrayBuffer(5 + message.data.byteLength);
+        const view = new DataView(encoded);
+        view.setUint8(0, 1);
+        view.setUint32(1, message.index);
+        new Uint8Array(encoded, 5).set(new Uint8Array(message.data));
+      } else if (message.type === 'file-end') {
+        encoded = new ArrayBuffer(1);
+        new Uint8Array(encoded)[0] = 2;
+      }
+      if (encoded) {
+        this.peerManager.sendDataToAll(encoded);
+      }
+    });
+  }
+
+  _streamFileToPeer(remoteUserId) {
+    if (!this.fileStream.file) return;
+
+    this.peerManager.sendDataToPeer = (remoteId, data) => {
+      const channels = this.peerManager.dataChannels.get(remoteId);
+      if (channels) {
+        channels.forEach(conn => {
+          if (conn.open) {
+            try {
+              conn.send(data);
+            } catch (err) {
+              console.warn('[RoomManager] Failed to send data to peer:', err.message);
+            }
+          }
+        });
+      }
+    };
+
+    this.fileStream.start(this.fileStream.file, (message) => {
+      let encoded;
+      if (message.type === 'file-meta') {
+        const jsonStr = JSON.stringify(message);
+        const encoder = new TextEncoder();
+        const encoded_json = encoder.encode(jsonStr);
+        encoded = new ArrayBuffer(encoded_json.length + 1);
+        new Uint8Array(encoded)[0] = 0;
+        new Uint8Array(encoded).set(encoded_json, 1);
+      } else if (message.type === 'file-chunk') {
+        encoded = new ArrayBuffer(5 + message.data.byteLength);
+        const view = new DataView(encoded);
+        view.setUint8(0, 1);
+        view.setUint32(1, message.index);
+        new Uint8Array(encoded, 5).set(new Uint8Array(message.data));
+      } else if (message.type === 'file-end') {
+        encoded = new ArrayBuffer(1);
+        new Uint8Array(encoded)[0] = 2;
+      }
+      if (encoded) {
+        this.peerManager.sendDataToPeer(remoteUserId, encoded);
+      }
+    });
   }
 
   toggleMicMute() {

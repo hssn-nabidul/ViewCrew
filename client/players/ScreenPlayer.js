@@ -6,6 +6,7 @@ export class ScreenPlayer extends PlayerInterface {
     this.video = null;
     this._currentStream = null;
     this._watchdog = null;
+    this._lastKnownTime = 0;
   }
 
   load(stream) {
@@ -40,6 +41,17 @@ export class ScreenPlayer extends PlayerInterface {
 
       this.video.onplay = () => this.onEvent('play', { time: this.video.currentTime });
       this.video.onpause = () => this.onEvent('pause', { time: this.video.currentTime });
+
+      // Prevent seeking on live screen share streams
+      this.video.onseeking = () => {
+        // Revert seek to current position
+        this.video.currentTime = this._lastKnownTime || 0;
+      };
+      this.video.ontimeupdate = () => {
+        if (this.video.readyState > 0) {
+          this._lastKnownTime = this.video.currentTime;
+        }
+      };
 
       // On mobile, show tap-to-play overlay instead of auto-play
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);

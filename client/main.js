@@ -65,7 +65,7 @@ const render = () => {
     console.log('[render] Rendering, hasEnteredTheater:', hasEnteredTheater, 'currentSource:', currentSource);
     
     // Render the new HTML
-    app.innerHTML = RoomUI.render(roomId, roomManager.participants, userId, currentSource, currentSourceValue, hasEnteredTheater, roomManager.isReconnecting, roomManager.fileTransfer);
+    app.innerHTML = RoomUI.render(roomId, roomManager.participants, userId, currentSource, currentSourceValue, hasEnteredTheater, roomManager.isReconnecting);
     
     const container = document.getElementById('video-container');
     const lobbyView = document.querySelector('[data-lobby]');

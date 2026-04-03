@@ -3,8 +3,6 @@ import { PeerManager } from './PeerManager';
 import { SyncEngine } from './SyncEngine';
 import { ScreenShare } from '../media/ScreenShare';
 import { VoiceChat } from '../media/VoiceChat';
-import { LocalFileStream } from '../media/LocalFileStream';
-import { LocalFileReceiver } from '../media/LocalFileReceiver';
 
 export class RoomManager {
   constructor(apiUrl, userId, displayName) {
@@ -27,13 +25,9 @@ export class RoomManager {
     this._refreshTimeouts = [];
     this._voiceStreams = new Map();
     this.micPermissionDenied = false;
-    this.fileStream = new LocalFileStream();
-    this.fileReceiver = new LocalFileReceiver();
-    this.fileTransfer = null;
 
     this.setupListeners();
     this.setupPeerManagerCallbacks();
-    this.setupFileStreaming();
   }
 
   setupPeerManagerCallbacks() {
@@ -189,16 +183,6 @@ export class RoomManager {
         if (this.voiceChat.isReady) {
           this.peerManager.callPeer(user.userId, 'voice');
         }
-
-        // If file streaming is active, stream to new joiner
-        if (this.fileStream.isStreaming && this.fileStream.file) {
-          console.log('[RoomManager] New user joined during file stream, creating DataChannel');
-          this.peerManager.createDataChannel(user.userId, 'file-stream');
-          // Re-stream file to new user after DataChannel opens
-          setTimeout(() => {
-            this._streamFileToPeer(user.userId);
-          }, 1000);
-        }
         }
 
         if (this.onUserJoined) {
@@ -260,11 +244,6 @@ export class RoomManager {
           this.onSpeakingChange(userId, isSpeaking);
         }
       }
-    });
-
-    this.socket.on('file-stream-available', ({ hostPeerId }) => {
-      console.log('[RoomManager] File stream available from host:', hostPeerId);
-      this.peerManager.createDataChannel(hostPeerId, 'file-stream');
     });
 
     this.socket.on('host-changed', ({ newHostId, displayName }) => {
@@ -548,207 +527,6 @@ export class RoomManager {
     }
   }
 
-  setupFileStreaming() {
-    this.peerManager.onDataChannelMessage = (remoteUserId, data) => {
-      if (!(data instanceof ArrayBuffer)) return;
-
-      const view = new DataView(data);
-      const typeByte = view.getUint8(0);
-      let message;
-
-      if (typeByte === 0) {
-        const jsonStr = new TextDecoder().decode(data.slice(1));
-        message = JSON.parse(jsonStr);
-      } else if (typeByte === 1) {
-        const index = view.getUint32(1);
-        message = { type: 'file-chunk', index, data: data.slice(5) };
-      } else if (typeByte === 2) {
-        message = { type: 'file-end' };
-      }
-
-      if (!message) return;
-
-      if (message.type === 'file-meta') {
-        this.fileReceiver.init(message.mimeType).then((video) => {
-          this.fileReceiver.fileInfo = message;
-          this.fileReceiver.isReceiving = true;
-          this.fileTransfer = {
-            filename: message.filename,
-            size: message.size,
-            progress: 0,
-            totalChunks: message.totalChunks
-          };
-          if (this.onStateChange) this.onStateChange(this.participants);
-        }).catch(err => {
-          console.error('[RoomManager] Failed to init file receiver:', err);
-        });
-      } else if (message.type === 'file-chunk') {
-        this.fileReceiver.receiveChunk(message);
-        if (this.fileReceiver.fileInfo) {
-          this.fileTransfer.progress = this.fileReceiver.chunks.size / this.fileReceiver.fileInfo.totalChunks;
-        }
-        if (this.fileReceiver.isReady && this.fileReceiver.video && !this.fileReceiver.video.parentNode) {
-          const container = document.getElementById('video-container');
-          if (container) {
-            container.innerHTML = '';
-            container.appendChild(this.fileReceiver.video);
-            this.fileReceiver._attached = true;
-          }
-        }
-      } else if (message.type === 'file-end') {
-        this.fileReceiver.receiveChunk(message);
-        this.fileTransfer = null;
-        if (this.onStateChange) this.onStateChange(this.participants);
-      }
-    };
-
-    this.fileStream.onProgress = (progress) => {
-      this.fileTransfer = {
-        filename: this.fileStream.file?.name || 'Streaming...',
-        size: this.fileStream.file?.size || 0,
-        progress,
-        totalChunks: this.fileStream.totalChunks
-      };
-      const bar = document.getElementById('file-transfer-progress-bar');
-      if (bar) {
-        bar.style.width = `${Math.round(progress * 100)}%`;
-      }
-      const text = document.querySelector('#file-transfer-overlay p:last-child');
-      if (text) {
-        text.textContent = `${Math.round(progress * 100)}% received`;
-      }
-    };
-
-    this.fileStream.onComplete = () => {
-      this.fileTransfer = null;
-      if (this.onStateChange) this.onStateChange(this.participants);
-    };
-  }
-
-  async startFileStream(file) {
-    if (!this.isHost && !this.participants.find(p => p.userId === this.userId)?.isHost) {
-      console.warn('[RoomManager] Only host can stream local files');
-      return;
-    }
-
-    if (!this.hasEnteredTheater) {
-      this.hasEnteredTheater = true;
-    }
-
-    // Don't set syncEngine source for host — host only streams, doesn't play locally
-    // Viewers will set their source when they receive file metadata
-
-    this.fileTransfer = {
-      filename: file.name,
-      size: file.size,
-      progress: 0,
-      totalChunks: Math.ceil(file.size / (16 * 1024))
-    };
-
-    if (this.onStateChange) this.onStateChange(this.participants);
-
-    const remoteUserIds = this.participants
-      .filter(p => p.userId !== this.userId)
-      .map(p => p.userId);
-
-    if (remoteUserIds.length === 0) {
-      console.warn('[RoomManager] No remote users to stream to');
-      return;
-    }
-
-    // Signal to all viewers that file streaming is available
-    this.socket.emit('file-stream-start', {
-      roomId: this.roomId,
-      hostId: this.userId,
-      hostPeerId: this.peerManager.userId
-    });
-
-    // Wait for viewers to connect DataChannels to us
-    await new Promise((resolve) => {
-      const check = () => {
-        const connected = remoteUserIds.every(id => {
-          const channels = this.peerManager.dataChannels.get(id);
-          return channels && channels.some(c => c.open);
-        });
-        if (connected) {
-          resolve();
-        } else {
-          setTimeout(check, 200);
-        }
-      };
-      setTimeout(check, 500);
-    });
-
-    console.log('[RoomManager] All viewer DataChannels connected, starting file stream');
-
-    this.fileStream.start(file, (message) => {
-      let encoded;
-      if (message.type === 'file-meta') {
-        const jsonStr = JSON.stringify(message);
-        const encoder = new TextEncoder();
-        const encoded_json = encoder.encode(jsonStr);
-        encoded = new ArrayBuffer(encoded_json.length + 1);
-        new Uint8Array(encoded)[0] = 0;
-        new Uint8Array(encoded).set(encoded_json, 1);
-      } else if (message.type === 'file-chunk') {
-        encoded = new ArrayBuffer(5 + message.data.byteLength);
-        const view = new DataView(encoded);
-        view.setUint8(0, 1);
-        view.setUint32(1, message.index);
-        new Uint8Array(encoded, 5).set(new Uint8Array(message.data));
-      } else if (message.type === 'file-end') {
-        encoded = new ArrayBuffer(1);
-        new Uint8Array(encoded)[0] = 2;
-      }
-      if (encoded) {
-        this.peerManager.sendDataToAll(encoded);
-      }
-    });
-  }
-
-  _streamFileToPeer(remoteUserId) {
-    if (!this.fileStream.file) return;
-
-    this.peerManager.sendDataToPeer = (remoteId, data) => {
-      const channels = this.peerManager.dataChannels.get(remoteId);
-      if (channels) {
-        channels.forEach(conn => {
-          if (conn.open) {
-            try {
-              conn.send(data);
-            } catch (err) {
-              console.warn('[RoomManager] Failed to send data to peer:', err.message);
-            }
-          }
-        });
-      }
-    };
-
-    this.fileStream.start(this.fileStream.file, (message) => {
-      let encoded;
-      if (message.type === 'file-meta') {
-        const jsonStr = JSON.stringify(message);
-        const encoder = new TextEncoder();
-        const encoded_json = encoder.encode(jsonStr);
-        encoded = new ArrayBuffer(encoded_json.length + 1);
-        new Uint8Array(encoded)[0] = 0;
-        new Uint8Array(encoded).set(encoded_json, 1);
-      } else if (message.type === 'file-chunk') {
-        encoded = new ArrayBuffer(5 + message.data.byteLength);
-        const view = new DataView(encoded);
-        view.setUint8(0, 1);
-        view.setUint32(1, message.index);
-        new Uint8Array(encoded, 5).set(new Uint8Array(message.data));
-      } else if (message.type === 'file-end') {
-        encoded = new ArrayBuffer(1);
-        new Uint8Array(encoded)[0] = 2;
-      }
-      if (encoded) {
-        this.peerManager.sendDataToPeer(remoteUserId, encoded);
-      }
-    });
-  }
-
   toggleMicMute() {
     if (!this.voiceChat.isReady) return;
     this.voiceChat.toggleMute();
@@ -770,14 +548,6 @@ export class RoomManager {
     
     if (this.voiceChat) {
       this.voiceChat.stop();
-    }
-    
-    if (this.fileStream) {
-      this.fileStream.stop();
-    }
-    
-    if (this.fileReceiver) {
-      this.fileReceiver.cleanup();
     }
     
     this._voiceStreams.forEach(({ element }) => {

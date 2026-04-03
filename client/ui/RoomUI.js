@@ -37,7 +37,7 @@ export const RoomUI = {
     RoomUI.sidebarTab = tab;
   },
 
-  render: (roomId, participants, userId, currentSource, currentSourceValue, hasEnteredTheater, isReconnecting = false, fileTransfer = null) => {
+  render: (roomId, participants, userId, currentSource, currentSourceValue, hasEnteredTheater, isReconnecting = false) => {
     if (!hasEnteredTheater) {
       return RoomUI.renderLobbyView(participants, userId, roomId);
     }
@@ -108,7 +108,7 @@ export const RoomUI = {
         <main class="flex-1 flex overflow-hidden" role="main">
           <!-- Main Cinema Stage -->
           <div class="flex-1 flex flex-col relative bg-black overflow-hidden">
-            ${activeView === 'source' ? RoomUI.renderSourceView() : RoomUI.renderWatchView(currentSource, currentSourceValue, participants, userId, isHost, fileTransfer)}
+            ${activeView === 'source' ? RoomUI.renderSourceView() : RoomUI.renderWatchView(currentSource, currentSourceValue, participants, userId, isHost)}
           </div>
 
           <!-- Desktop Sidebar (Chat & People) -->
@@ -270,7 +270,7 @@ export const RoomUI = {
     `;
   },
 
-  renderWatchView: (currentSource, currentSourceValue, participants, userId, isHost, fileTransfer = null) => {
+  renderWatchView: (currentSource, currentSourceValue, participants, userId, isHost) => {
     const isWaiting = !currentSource && !isHost;
 
     if (isWaiting) {
@@ -346,28 +346,6 @@ export const RoomUI = {
           <div id="video-container" class="w-full h-full relative z-0 flex items-center justify-center" aria-live="polite">
             <!-- Video element injected here -->
           </div>
-
-          ${fileTransfer ? `
-          <div id="file-transfer-overlay" class="absolute inset-0 z-40 flex items-center justify-center bg-black/80 backdrop-blur-sm" role="status" aria-live="polite" aria-label="File transfer in progress">
-            <div class="text-center space-y-4 md:space-y-6 p-6 md:p-10 max-w-sm">
-              <div class="relative inline-block">
-                <div class="w-20 md:w-24 rounded-full bg-surface-elevated border-2 border-primary/30 flex items-center justify-center animate-pulse">
-                  <span class="material-symbols-outlined text-4xl md:text-5xl text-primary" aria-hidden="true">file_download</span>
-                </div>
-              </div>
-              <div class="space-y-2">
-                <h3 class="text-lg md:text-xl font-bold text-on-surface truncate">${escapeHtml(fileTransfer.filename || 'Receiving file...')}</h3>
-                <p class="text-sm text-on-surface-variant/60">${fileTransfer.size ? (fileTransfer.size / (1024 * 1024)).toFixed(1) + ' MB' : 'Calculating...'}</p>
-              </div>
-              <div class="space-y-2">
-                <div class="w-full h-2 bg-white/10 rounded-full overflow-hidden">
-                  <div id="file-transfer-progress-bar" class="h-full bg-primary rounded-full transition-all duration-300" style="width: ${Math.round((fileTransfer.progress || 0) * 100)}%"></div>
-                </div>
-                <p class="text-xs font-mono font-bold text-on-surface-variant/80">${Math.round((fileTransfer.progress || 0) * 100)}% received</p>
-              </div>
-            </div>
-          </div>
-          ` : ''}
 
           <!-- Cinema Controls Overlay -->
           <div 
@@ -1116,10 +1094,24 @@ export const RoomUI = {
       btnLocal.onclick = () => { inputLocal.value = ''; inputLocal.click(); };
       inputLocal.onchange = (e) => {
         const file = e.target.files[0];
-        if (file && roomManager.startFileStream) {
+        if (file) {
+          const blobUrl = URL.createObjectURL(file);
+          
+          if (!roomManager.hasEnteredTheater) {
+            roomManager.hasEnteredTheater = true;
+          }
+          
           RoomUI.currentTab = 'watch';
+          
+          if (roomManager.syncEngine) {
+            roomManager.syncEngine._pendingSource = { source: 'local', value: blobUrl };
+            roomManager.syncEngine.currentSource = 'local';
+            roomManager.syncEngine.currentSourceValue = file.name;
+          }
+          
           render();
-          roomManager.startFileStream(file);
+          
+          roomManager.syncEngine.changeSource('local', blobUrl, roomManager.roomId);
         }
       };
     }

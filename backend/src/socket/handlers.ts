@@ -285,21 +285,6 @@ export function setupSocketHandlers(io: Server): void {
       }
     });
 
-    socket.on('file-stream-start', (data: { roomId: string, hostId: string }) => {
-      if (!checkRateLimit(socket, generalLimiter, 'file-stream-start')) return;
-      const normalizedRoomId = (data.roomId || socketData.roomId)?.toUpperCase();
-      if (!normalizedRoomId) return;
-      
-      const room = getRoom(normalizedRoomId);
-      if (!room) return;
-      
-      // Notify all other participants that file streaming has started
-      socket.to(normalizedRoomId).emit('file-stream-available', {
-        hostId: data.hostId,
-        hostPeerId: data.hostId
-      });
-    });
-
     socket.on('update-display-name', (data: { roomId: string; userId: string; displayName: string }) => {
       if (!checkRateLimit(socket, generalLimiter, 'update-display-name')) return;
       const roomId = validateRoomId(data?.roomId);

@@ -79,6 +79,19 @@ export class PeerManager {
     });
   }
 
+  stopScreenShare() {
+    this.calls.forEach(calls => {
+      if (calls.screen) {
+        calls.screen.close();
+      }
+    });
+    if (this.screenStream) {
+      this.screenStream.getTracks().forEach(t => t.stop());
+      this.screenStream = null;
+    }
+    this._cachedScreenStream = null;
+  }
+
   destroy() {
     this.calls.forEach(calls => {
       if (calls.screen) calls.screen.close();

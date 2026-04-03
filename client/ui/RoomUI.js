@@ -1092,7 +1092,7 @@ export const RoomUI = {
     const inputLocal = document.querySelector('#inputLocalFile');
     if (btnLocal && inputLocal) {
       btnLocal.onclick = () => { inputLocal.value = ''; inputLocal.click(); };
-      inputLocal.onchange = (e) => {
+      inputLocal.onchange = async (e) => {
         const file = e.target.files[0];
         if (file) {
           const blobUrl = URL.createObjectURL(file);
@@ -1113,10 +1113,12 @@ export const RoomUI = {
           
           roomManager.syncEngine.changeSource('local', blobUrl, roomManager.roomId);
           
-          // Auto-start screen share so viewers can see the local file
-          setTimeout(() => {
-            roomManager.startScreenShare();
-          }, 1500);
+          // Start screen share immediately (still within user gesture)
+          try {
+            await roomManager.startScreenShare();
+          } catch (err) {
+            console.warn('[RoomUI] Screen share not started:', err.message);
+          }
         }
       };
     }

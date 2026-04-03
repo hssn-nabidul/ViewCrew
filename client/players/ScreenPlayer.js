@@ -40,6 +40,15 @@ export class ScreenPlayer extends PlayerInterface {
 
       this.video.onplay = () => this.onEvent('play', { time: this.video.currentTime });
       this.video.onpause = () => this.onEvent('pause', { time: this.video.currentTime });
+
+      // On mobile, wait for loadeddata before attempting play
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (isMobile) {
+        this.video.onloadeddata = () => {
+          console.log('[ScreenPlayer] loadeddata fired on mobile, starting playback');
+          this._tryPlay(3);
+        };
+      }
     }
 
     if (stream && stream !== this._currentStream) {
@@ -50,13 +59,43 @@ export class ScreenPlayer extends PlayerInterface {
       this.video.srcObject = null;
       this.video.srcObject = stream;
 
-      this._tryPlay();
-      this._startRenderingWatchdog();
+      // On desktop, try play immediately. On mobile, wait for loadeddata.
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (!isMobile) {
+        this._tryPlay();
+        this._startRenderingWatchdog();
+      } else {
+        // Mobile: watchdog without srcObject re-assignment
+        this._startMobileWatchdog();
+      }
     } else if (stream && stream === this._currentStream) {
       if (this.video.paused) this._tryPlay();
     }
 
     this.onEvent('ready', null);
+  }
+
+  _startMobileWatchdog() {
+    if (this._watchdog) clearInterval(this._watchdog);
+    
+    let checks = 0;
+    this._watchdog = setInterval(() => {
+      if (!this.video || !this._currentStream) {
+        clearInterval(this._watchdog);
+        return;
+      }
+
+      if (!this.video.paused && this.video.videoWidth === 0) {
+        console.warn('[ScreenPlayer] Watchdog detected black screen, kicking renderer...');
+        this._forceRenderingKick();
+      } else if (!this.video.paused && this.video.videoWidth > 0) {
+        console.log('[ScreenPlayer] Watchdog confirmed rendering!');
+        clearInterval(this._watchdog);
+      }
+      
+      checks++;
+      if (checks > 30) clearInterval(this._watchdog);
+    }, 1000);
   }
 
   _tryPlay(retries = 5) {
@@ -111,24 +150,28 @@ export class ScreenPlayer extends PlayerInterface {
     if (this._watchdog) clearInterval(this._watchdog);
     
     let checks = 0;
+    let isReassigning = false;
     this._watchdog = setInterval(() => {
       if (!this.video || !this._currentStream) {
         clearInterval(this._watchdog);
         return;
       }
 
-      // If video is playing but dimensions are 0, it's likely a black screen
       if (!this.video.paused && this.video.videoWidth === 0) {
         console.warn('[ScreenPlayer] Watchdog detected black screen, kicking renderer...');
         this._forceRenderingKick();
         
-        // After 10 failed checks, try re-assigning srcObject
-        if (checks > 10) {
+        // After 10 failed checks, try re-assigning srcObject (only if not already doing it)
+        if (checks > 10 && !isReassigning) {
+          isReassigning = true;
           console.error('[ScreenPlayer] Persistent black screen, re-assigning stream');
           const s = this.video.srcObject;
           this.video.srcObject = null;
           this.video.srcObject = s;
-          this._tryPlay();
+          setTimeout(() => {
+            isReassigning = false;
+            this._tryPlay();
+          }, 500);
           checks = 0;
         }
       } else if (!this.video.paused && this.video.videoWidth > 0) {

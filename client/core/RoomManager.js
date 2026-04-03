@@ -252,6 +252,17 @@ export class RoomManager {
       }
     });
 
+    this.socket.on('host-changed', ({ newHostId, displayName }) => {
+      console.log(`[RoomManager] Host changed to: ${displayName} (${newHostId})`);
+      this.participants.forEach(p => {
+        p.isHost = p.userId === newHostId || p.id === newHostId;
+      });
+      if (this.onStateChange) this.onStateChange(this.participants);
+      if (this.onHostChanged) {
+        this.onHostChanged(newHostId, displayName);
+      }
+    });
+
     this.socket.on('new-reaction', (data) => {
       if (this.onReaction) {
         this.onReaction(data);
@@ -278,24 +289,23 @@ export class RoomManager {
     }
   }
 
-  joinRoom(roomId, participantId, hostToken) {
+  joinRoom(roomId, participantId, hostToken, password = null) {
     this.roomId = roomId;
-    if (participantId) this.userId = participantId;
-    if (hostToken) this.hostToken = hostToken;
     this.socket.emit('join-room', {
-      roomId: this.roomId,
-      userId: this.userId,
+      roomId,
+      userId: participantId,
       displayName: this.displayName,
-      hostToken: this.hostToken
+      hostToken,
+      password
     });
   }
 
-  async createRoom(name) {
+  async createRoom(name, password = null) {
     try {
       const res = await fetch(`${this.apiUrl}/api/rooms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hostName: name })
+        body: JSON.stringify({ hostName: name, password })
       });
       const data = await res.json();
       if (data.participantId) {

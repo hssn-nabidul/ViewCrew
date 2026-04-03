@@ -53,6 +53,31 @@ export const LandingUI = {
                     <span id="name-hint" class="sr-only">Enter your display name for the watch party</span>
                   </div>
                   
+                  <div class="space-y-2">
+                    <label for="inputRoomPassword" class="block text-xs font-bold uppercase tracking-widest text-on-surface-variant ml-1">
+                      Room Password <span class="text-on-surface-variant/40">(optional)</span>
+                    </label>
+                    <div class="relative">
+                      <input 
+                        id="inputRoomPassword" 
+                        type="password" 
+                        placeholder="Set a password for your room" 
+                        class="input-field pr-10"
+                        aria-describedby="password-hint"
+                        autocomplete="new-password"
+                      />
+                      <button 
+                        id="btnTogglePassword" 
+                        type="button"
+                        class="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 hover:text-on-surface-variant transition-colors"
+                        aria-label="Show password"
+                      >
+                        <span class="material-symbols-outlined text-lg" aria-hidden="true">visibility_off</span>
+                      </button>
+                    </div>
+                    <span id="password-hint" class="sr-only">Optional password to protect your room</span>
+                  </div>
+                  
                   <button 
                     id="btnCreateRoom" 
                     class="btn-primary w-full h-12 md:h-14 text-base md:text-lg"
@@ -113,8 +138,10 @@ export const LandingUI = {
     const btnCreate = document.querySelector('#btnCreateRoom');
     const btnHeroCreate = document.querySelector('#btnHeroCreate');
     const btnJoin = document.querySelector('#btnJoinRoom');
+    const btnTogglePassword = document.querySelector('#btnTogglePassword');
     const inputName = document.querySelector('#inputName');
     const inputRoomCode = document.querySelector('#inputRoomCode');
+    const inputRoomPassword = document.querySelector('#inputRoomPassword');
 
     const handleCreate = () => {
       const name = inputName?.value.trim();
@@ -124,7 +151,8 @@ export const LandingUI = {
         return;
       }
       inputName?.setAttribute('aria-invalid', 'false');
-      callbacks.onCreateRoom(name);
+      const password = inputRoomPassword?.value.trim() || null;
+      callbacks.onCreateRoom(name, password);
     };
 
     if (btnCreate) {
@@ -136,6 +164,15 @@ export const LandingUI = {
 
     if (btnHeroCreate) {
       btnHeroCreate.onclick = handleCreate;
+    }
+
+    if (btnTogglePassword) {
+      btnTogglePassword.onclick = () => {
+        const isPassword = inputRoomPassword?.type === 'password';
+        inputRoomPassword.type = isPassword ? 'text' : 'password';
+        btnTogglePassword.querySelector('.material-symbols-outlined').textContent = isPassword ? 'visibility' : 'visibility_off';
+        btnTogglePassword.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+      };
     }
 
     if (btnJoin) {

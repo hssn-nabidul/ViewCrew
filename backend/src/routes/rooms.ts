@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { createHash } from 'crypto';
 import { Room, Participant, CreateRoomResponse, RoomInfoResponse, JoinRoomResponse, ParticipantListResponse, ApiError } from '../models/room';
 
 const router = Router();
@@ -109,7 +110,7 @@ function scheduleRoomDestroy(room: Room, delayMs: number = 60000): void {
 // POST /api/rooms - Create a new room
 router.post('/', async (req: Request, res: Response) => {
   try {
-    const { hostName } = req.body;
+    const { hostName, password } = req.body;
     
     if (!hostName || typeof hostName !== 'string' || hostName.trim().length === 0) {
       const error: ApiError = { error: 'VALIDATION_ERROR', message: 'hostName is required' };
@@ -136,10 +137,15 @@ router.post('/', async (req: Request, res: Response) => {
       isHost: true
     };
     
+    const passwordHash = password && typeof password === 'string' && password.length > 0
+      ? createHash('sha256').update(password).digest('hex')
+      : null;
+    
     const room: Room = {
       id: roomId,
       hostId: hostId,
       hostToken: hostToken,
+      passwordHash,
       participants: new Map([[hostId, hostParticipant]]),
       createdAt: new Date(),
       isActive: true,
@@ -158,7 +164,7 @@ router.post('/', async (req: Request, res: Response) => {
       participantId: hostId
     };
     
-    console.log(`[Room] Created room ${roomId} by host ${hostName}`);
+    console.log(`[Room] Created room ${roomId} by host ${hostName}${passwordHash ? ' (password-protected)' : ''}`);
     res.status(201).json(response);
   } catch (error) {
     console.error('[Room] Error creating room:', error);
@@ -191,7 +197,7 @@ router.get('/:id', (req: Request, res: Response) => {
 // POST /api/rooms/:id/join - Join a room
 router.post('/:id/join', (req: Request, res: Response) => {
   const { id } = req.params;
-  const { participantName, participantId: existingParticipantId } = req.body;
+  const { participantName, participantId: existingParticipantId, password } = req.body;
   
   if (!participantName || typeof participantName !== 'string' || participantName.trim().length === 0) {
     res.status(400).json({ error: 'VALIDATION_ERROR', message: 'participantName is required' });
@@ -209,6 +215,17 @@ router.post('/:id/join', (req: Request, res: Response) => {
   if (!room || !room.isActive) {
     res.status(404).json({ error: 'NOT_FOUND', message: 'Room not found' });
     return;
+  }
+  
+  // Validate password if room is password-protected
+  if (room.passwordHash) {
+    const providedHash = password && typeof password === 'string'
+      ? createHash('sha256').update(password).digest('hex')
+      : null;
+    if (providedHash !== room.passwordHash) {
+      res.status(403).json({ error: 'WRONG_PASSWORD', message: 'Incorrect room password' });
+      return;
+    }
   }
   
   // If participantId is provided, try to rejoin as existing participant

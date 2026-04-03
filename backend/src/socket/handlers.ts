@@ -11,6 +11,7 @@ import {
   validateTime,
   validateUserId,
 } from '../middleware/validation';
+import { createHash } from 'crypto';
 
 // Socket data stored per connection
 interface SocketData {
@@ -62,7 +63,7 @@ export function setupSocketHandlers(io: Server): void {
     socket.data = socketData;
 
     // join-room: Join a room namespace
-    socket.on('join-room', async (data: { roomId: string; userId: string; displayName: string; hostToken?: string }) => {
+    socket.on('join-room', async (data: { roomId: string; userId: string; displayName: string; hostToken?: string; password?: string }) => {
       try {
         if (!checkRateLimit(socket, generalLimiter, 'join-room')) return;
 
@@ -89,6 +90,17 @@ export function setupSocketHandlers(io: Server): void {
         if (!room || !room.isActive) {
           socket.emit('error', { code: 'ROOM_NOT_FOUND', message: 'Room not found' });
           return;
+        }
+        
+        // Validate password if room is password-protected
+        if (room.passwordHash) {
+          const providedHash = data?.password && typeof data.password === 'string'
+            ? createHash('sha256').update(data.password).digest('hex')
+            : null;
+          if (providedHash !== room.passwordHash) {
+            socket.emit('error', { code: 'WRONG_PASSWORD', message: 'Incorrect room password' });
+            return;
+          }
         }
         
         // Find participant in room

@@ -12,6 +12,7 @@ export interface Room {
   id: string;
   hostId: string;
   hostToken: string;
+  passwordHash: string | null;
   participants: Map<string, Participant>;
   createdAt: Date;
   isActive: boolean;

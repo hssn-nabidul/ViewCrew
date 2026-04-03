@@ -176,6 +176,15 @@ const render = () => {
       toastManager.show(`${user.displayName} left`, { type: 'info', icon: 'person_off' });
     };
 
+    roomManager.onHostChanged = (newHostId, displayName) => {
+      const isMe = newHostId === roomManager.userId;
+      if (isMe) {
+        toastManager.show('You are now the host', { type: 'success', icon: 'verified' });
+      } else {
+        toastManager.show(`${displayName} is now the host`, { type: 'info', icon: 'admin_panel_settings' });
+      }
+    };
+
     // Reaction manager
     if (!reactionManager) {
       reactionManager = new ReactionManager('video-stage', (emojiId) => {
@@ -207,6 +216,18 @@ const render = () => {
     if (!roomManager.roomId) {
       roomManager.joinRoom(roomId, userId, storage.getHostToken());
     }
+
+    roomManager.socket.on('error', ({ code, message }) => {
+      if (code === 'WRONG_PASSWORD') {
+        const password = prompt('This room is password-protected. Enter the password:');
+        if (password !== null) {
+          roomManager.joinRoom(roomId, userId, storage.getHostToken(), password);
+        }
+      } else if (code === 'ROOM_NOT_FOUND') {
+        alert('Room not found or has expired.');
+        window.location.href = '/';
+      }
+    });
   } else {
     app.innerHTML = LandingUI.render(displayName);
     
@@ -216,11 +237,11 @@ const render = () => {
     }
     
     LandingUI.initListeners({
-      onCreateRoom: async (name) => {
+      onCreateRoom: async (name, password) => {
         const finalName = name || `User_${userId}`;
         storage.setDisplayName(finalName);
         try {
-          const data = await roomManager.createRoom(finalName);
+          const data = await roomManager.createRoom(finalName, password);
           if (data.roomId && data.participantId && data.hostToken) {
             userId = data.participantId;
             storage.setUserId(userId);
@@ -237,11 +258,40 @@ const render = () => {
           storage.setDisplayName(finalName);
           
           try {
-            const res = await fetch(`${API_URL}/api/rooms/${room}/join`, {
+            // First check room info to see if password is needed
+            const infoRes = await fetch(`${API_URL}/api/rooms/${room}`);
+            if (!infoRes.ok) {
+              alert('Room not found.');
+              return;
+            }
+            
+            const info = await infoRes.json();
+            let password = null;
+            
+            // Try joining without password first
+            let res = await fetch(`${API_URL}/api/rooms/${room}/join`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ participantName: finalName, participantId: userId })
             });
+            
+            if (res.status === 403) {
+              // Room requires password - prompt user
+              password = prompt('This room is password-protected. Enter the password:');
+              if (password === null) return; // User cancelled
+              
+              res = await fetch(`${API_URL}/api/rooms/${room}/join`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ participantName: finalName, participantId: userId, password })
+              });
+              
+              if (res.status === 403) {
+                alert('Incorrect password.');
+                return;
+              }
+            }
+            
             const data = await res.json();
             
             if (data.participantId) {

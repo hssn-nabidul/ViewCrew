@@ -101,6 +101,102 @@ export class PeerManager {
     });
   }
 
+  callPeer(remoteUserId, type = 'screen') {
+    let stream;
+    if (type === 'voice') {
+      stream = this.voiceStream;
+    } else {
+      stream = this.screenStream;
+    }
+
+    if (!stream) {
+      console.warn(`[PeerManager] Cannot call ${type} — stream not ready`);
+      return;
+    }
+
+    const tracks = stream.getTracks();
+    if (tracks.length === 0) {
+      console.warn(`[PeerManager] Cannot call ${type} — stream has no tracks`);
+      return;
+    }
+
+    const liveTracks = tracks.filter(t => t.readyState === 'live');
+    console.log(`[PeerManager] Calling ${remoteUserId} (${type}) with ${liveTracks.length}/${tracks.length} live tracks`);
+
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    const options = {
+      metadata: { type },
+      constraints: {
+        mandatory: {
+          OfferToReceiveAudio: type === 'voice',
+          OfferToReceiveVideo: type === 'screen'
+        }
+      },
+      sdpTransform: isMobile ? (sdp) => {
+        const h264Regex = /(a=rtpmap:\d+ H264\/\d+)/;
+        const match = sdp.match(h264Regex);
+        if (match) {
+          const payloadType = match[0].match(/\d+/)[0];
+          sdp = sdp.replace(/(m=video \d+ [A-Z]+\/TLS\/RTP\/SAVPF )(.+)/, (match, prefix, payloads) => {
+            const payloadList = payloads.split(' ');
+            const h264Index = payloadList.indexOf(payloadType);
+            if (h264Index > 0) {
+              payloadList.splice(h264Index, 1);
+              payloadList.unshift(payloadType);
+              return prefix + payloadList.join(' ');
+            }
+            return match;
+          });
+        }
+        return sdp;
+      } : undefined
+    };
+
+    const call = this.peer.call(remoteUserId, stream, options);
+    this.handleCall(call, type);
+  }
+
+  handleCall(call, type) {
+    const existingCalls = this.calls.get(call.peer) || {};
+    
+    if (existingCalls[type]) {
+      console.log(`[PeerManager] Closing existing ${type} call from ${call.peer} before handling new one`);
+      existingCalls[type].close();
+    }
+
+    existingCalls[type] = call;
+    this.calls.set(call.peer, existingCalls);
+
+    call.on('stream', (remoteStream) => {
+      console.log(`[PeerManager] Received remote ${type} stream from: ${call.peer}`);
+      if (this.onRemoteStream) {
+        this.onRemoteStream(call.peer, remoteStream, type);
+      }
+    });
+
+    call.on('close', () => {
+      console.log(`[PeerManager] ${type} call closed with: ${call.peer}`);
+      const calls = this.calls.get(call.peer);
+      if (calls) {
+        delete calls[type];
+        if (this.onRemoteStreamRemoved) {
+          this.onRemoteStreamRemoved(call.peer, type);
+        }
+      }
+    });
+
+    call.on('error', (err) => {
+      console.error(`[PeerManager] ${type} call error with ${call.peer}:`, err);
+    });
+  }
+
+  removeCallReference(remoteUserId, type) {
+    const calls = this.calls.get(remoteUserId);
+    if (calls) {
+      delete calls[type];
+    }
+  }
+
   destroy() {
     this.calls.forEach(calls => {
       if (calls.screen) calls.screen.close();

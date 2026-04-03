@@ -177,12 +177,12 @@ export class RoomManager {
         this.participants.push(user);
 
         if (user.userId !== this.userId) {
-          if (this.screenShare.isActive()) {
+          if (this.screenShare.isActive() || this.peerManager.screenStream) {
             this.peerManager.callPeer(user.userId, 'screen');
           }
-        if (this.voiceChat.isReady) {
-          this.peerManager.callPeer(user.userId, 'voice');
-        }
+          if (this.voiceChat.isReady) {
+            this.peerManager.callPeer(user.userId, 'voice');
+          }
         }
 
         if (this.onUserJoined) {

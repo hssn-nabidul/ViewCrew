@@ -1103,15 +1103,6 @@ export const RoomUI = {
           
           RoomUI.currentTab = 'watch';
           
-          // Tell viewers a screen share is coming BEFORE loading locally
-          roomManager.socket.emit('sync-event', {
-            roomId: roomManager.roomId,
-            type: 'source-change',
-            source: 'screen',
-            sourceValue: roomManager.userId,
-            time: 0
-          });
-          
           if (roomManager.syncEngine) {
             roomManager.syncEngine._pendingSource = { source: 'local', value: blobUrl };
             roomManager.syncEngine.currentSource = 'local';
@@ -1121,13 +1112,6 @@ export const RoomUI = {
           render();
           
           roomManager.syncEngine.changeSource('local', blobUrl, roomManager.roomId);
-          
-          // Start screen share immediately (still within user gesture)
-          try {
-            await roomManager.startScreenShare();
-          } catch (err) {
-            console.warn('[RoomUI] Screen share not started:', err.message);
-          }
         }
       };
     }

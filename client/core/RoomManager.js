@@ -581,7 +581,14 @@ export class RoomManager {
         this.fileReceiver.receiveChunk(message);
         if (this.fileReceiver.fileInfo) {
           this.fileTransfer.progress = this.fileReceiver.chunks.size / this.fileReceiver.fileInfo.totalChunks;
-          if (this.onStateChange) this.onStateChange(this.participants);
+        }
+        if (this.fileReceiver.isReady && this.fileReceiver.video && !this.fileReceiver.video.parentNode) {
+          const container = document.getElementById('video-container');
+          if (container) {
+            container.innerHTML = '';
+            container.appendChild(this.fileReceiver.video);
+            this.fileReceiver._attached = true;
+          }
         }
       } else if (message.type === 'file-end') {
         this.fileReceiver.receiveChunk(message);
@@ -623,11 +630,8 @@ export class RoomManager {
       this.hasEnteredTheater = true;
     }
 
-    if (this.syncEngine) {
-      this.syncEngine._pendingSource = { source: 'local', value: file.name };
-      this.syncEngine.currentSource = 'local';
-      this.syncEngine.currentSourceValue = file.name;
-    }
+    // Don't set syncEngine source for host — host only streams, doesn't play locally
+    // Viewers will set their source when they receive file metadata
 
     this.fileTransfer = {
       filename: file.name,

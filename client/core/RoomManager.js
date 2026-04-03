@@ -262,6 +262,11 @@ export class RoomManager {
       }
     });
 
+    this.socket.on('file-stream-available', ({ hostPeerId }) => {
+      console.log('[RoomManager] File stream available from host:', hostPeerId);
+      this.peerManager.createDataChannel(hostPeerId, 'file-stream');
+    });
+
     this.socket.on('host-changed', ({ newHostId, displayName }) => {
       console.log(`[RoomManager] Host changed to: ${displayName} (${newHostId})`);
       this.participants.forEach(p => {
@@ -651,15 +656,30 @@ export class RoomManager {
       return;
     }
 
-    try {
-      await this.peerManager.createDataChannelsToAll(remoteUserIds, 'file-stream');
-      console.log('[RoomManager] All DataChannels open, starting file stream');
-    } catch (err) {
-      console.error('[RoomManager] Failed to create DataChannels:', err);
-      this.fileTransfer = null;
-      if (this.onStateChange) this.onStateChange(this.participants);
-      return;
-    }
+    // Signal to all viewers that file streaming is available
+    this.socket.emit('file-stream-start', {
+      roomId: this.roomId,
+      hostId: this.userId,
+      hostPeerId: this.peerManager.userId
+    });
+
+    // Wait for viewers to connect DataChannels to us
+    await new Promise((resolve) => {
+      const check = () => {
+        const connected = remoteUserIds.every(id => {
+          const channels = this.peerManager.dataChannels.get(id);
+          return channels && channels.some(c => c.open);
+        });
+        if (connected) {
+          resolve();
+        } else {
+          setTimeout(check, 200);
+        }
+      };
+      setTimeout(check, 500);
+    });
+
+    console.log('[RoomManager] All viewer DataChannels connected, starting file stream');
 
     this.fileStream.start(file, (message) => {
       let encoded;

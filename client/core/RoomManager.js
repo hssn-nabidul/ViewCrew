@@ -328,8 +328,7 @@ export class RoomManager {
 
     const originalOnPlayerEvent = this.syncEngine.onPlayerEvent.bind(this.syncEngine);
     this.syncEngine.onPlayerEvent = (type, data) => {
-      originalOnPlayerEvent(type, data);
-
+      // Don't emit sync events for local files — screen share handles sync
       if (this.syncEngine.isHost && this.syncEngine.currentSource === 'local') {
         if (type === 'play' && !this.syncEngine._hasCaptured) {
           const videoElement = this.syncEngine.player.video;
@@ -338,7 +337,10 @@ export class RoomManager {
             this.refreshLocalStream(videoElement);
           }
         }
+        return;
       }
+
+      originalOnPlayerEvent(type, data);
     };
   }
 

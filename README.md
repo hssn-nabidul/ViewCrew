@@ -4,11 +4,15 @@ A browser-based watch party platform for real-time synchronized video watching w
 
 ## Features
 
-- **Video Sync** — YouTube and direct MP4 URL playback with host-controlled synchronization
+- **Video Sync** — YouTube (any URL format) and direct MP4 URL playback with host-controlled synchronization
+- **Local File Streaming** — Share local video files via WebRTC DataChannels with real-time chunking
 - **Screen Sharing** — WebRTC-based screen sharing with late-joiner support
+- **Voice Chat** — Full-mesh P2P voice with speaking indicators and mute toggle
 - **Text Chat** — Real-time chat with rate limiting and input sanitization
 - **Emoji Reactions** — Floating emoji reactions visible to all participants
-- **Voice Indicators** — Speaking detection with visual pulse indicators
+- **Host Handoff** — Automatic host promotion when the current host disconnects
+- **Room Passwords** — Optional password protection for private rooms
+- **Drift Correction** — Automatic playback resync for viewers with >3s drift
 - **Reconnection** — Automatic reconnection with visual indicator and state recovery
 - **Dark Theme** — Full dark-mode UI with responsive design
 
@@ -96,32 +100,53 @@ Navigate to `http://localhost:5173` in your browser. Create a room or join an ex
 
 ## Production Deployment
 
-### Backend
+### One-Click Deploy
+
+#### Backend → [Render](https://render.com)
+
+1. Fork this repo to your GitHub account
+2. Go to [Render Dashboard](https://dashboard.render.com) → New → Blueprint
+3. Select your forked repo
+4. Render reads `render.yaml` and creates the service automatically
+5. After deployment, copy the Render URL (e.g. `https://viewcrew-backend.onrender.com`)
+
+#### Frontend → [Vercel](https://vercel.com)
+
+1. Go to [Vercel Dashboard](https://vercel.com) → New Project
+2. Import your forked repo
+3. Set the **Root Directory** to `client`
+4. Add environment variable:
+   - `VITE_API_URL` = your Render backend URL (e.g. `https://viewcrew-backend.onrender.com`)
+5. Deploy — Vercel reads `client/vercel.json` automatically
+
+### Manual Deploy
+
+#### Backend (Render / any Node host)
 
 ```bash
 cd backend
+npm install
 npm run build
 npm start
 ```
 
-For HTTPS production deployment, set `USE_HTTPS=true` and provide cert paths:
+Set these environment variables on your host:
 
-```bash
-USE_HTTPS=true \
-HTTPS_CERT_PATH=/etc/ssl/certs/cert.pem \
-HTTPS_KEY_PATH=/etc/ssl/private/key.pem \
-PORT=443 \
-npm start
-```
+| Variable | Value |
+|----------|-------|
+| `NODE_ENV` | `production` |
+| `CORS_ORIGINS` | Your Vercel URL (e.g. `https://viewcrew.vercel.app`) |
+| `PORT` | `3000` (Render sets this automatically) |
 
-### Frontend
+#### Frontend (Vercel / any static host)
 
 ```bash
 cd client
-npm run build
+npm install
+VITE_API_URL=https://your-backend-url.com npm run build
 ```
 
-The built files are in `client/dist/`. Serve them with any static file server (Netlify, Vercel, nginx, etc.).
+The built files are in `client/dist/`. Serve them with any static file server.
 
 ### Docker (optional)
 

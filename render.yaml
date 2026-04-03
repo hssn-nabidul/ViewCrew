@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: viewcrew-backend
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: cd backend && npm install && npm run build
+    startCommand: cd backend && npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CORS_ORIGINS
+        sync: false
+      - key: PORT
+        value: 3000

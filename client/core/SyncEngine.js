@@ -343,7 +343,9 @@ export class SyncEngine {
       console.log('[SyncEngine] Calling player.load with stream');
       this.player.load(stream);
 
-      if (!this.isHost) {
+      // Don't call play() on mobile — ScreenPlayer handles it via loadeddata
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if (!this.isHost && !isMobile) {
         setTimeout(() => {
           console.log('[SyncEngine] Calling player.play after stream attach');
           if (this.player) this.player.play();

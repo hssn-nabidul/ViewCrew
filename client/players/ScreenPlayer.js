@@ -41,12 +41,12 @@ export class ScreenPlayer extends PlayerInterface {
       this.video.onplay = () => this.onEvent('play', { time: this.video.currentTime });
       this.video.onpause = () => this.onEvent('pause', { time: this.video.currentTime });
 
-      // On mobile, wait for loadeddata before attempting play
+      // On mobile, show tap-to-play overlay instead of auto-play
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       if (isMobile) {
         this.video.onloadeddata = () => {
-          console.log('[ScreenPlayer] loadeddata fired on mobile, starting playback');
-          this._tryPlay(3);
+          console.log('[ScreenPlayer] loadeddata fired on mobile, showing tap overlay');
+          this.showPlayOverlay();
         };
       }
     }
@@ -55,47 +55,22 @@ export class ScreenPlayer extends PlayerInterface {
       this._currentStream = stream;
       this._attachStreamListeners(stream);
 
-      // FIX: Force reset srcObject
-      this.video.srcObject = null;
-      this.video.srcObject = stream;
+      // Only reset srcObject if not already set
+      if (this.video.srcObject !== stream) {
+        this.video.srcObject = stream;
+      }
 
-      // On desktop, try play immediately. On mobile, wait for loadeddata.
+      // On desktop, try play immediately. On mobile, show tap overlay.
       const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
       if (!isMobile) {
         this._tryPlay();
         this._startRenderingWatchdog();
-      } else {
-        // Mobile: watchdog without srcObject re-assignment
-        this._startMobileWatchdog();
       }
     } else if (stream && stream === this._currentStream) {
       if (this.video.paused) this._tryPlay();
     }
 
     this.onEvent('ready', null);
-  }
-
-  _startMobileWatchdog() {
-    if (this._watchdog) clearInterval(this._watchdog);
-    
-    let checks = 0;
-    this._watchdog = setInterval(() => {
-      if (!this.video || !this._currentStream) {
-        clearInterval(this._watchdog);
-        return;
-      }
-
-      if (!this.video.paused && this.video.videoWidth === 0) {
-        console.warn('[ScreenPlayer] Watchdog detected black screen, kicking renderer...');
-        this._forceRenderingKick();
-      } else if (!this.video.paused && this.video.videoWidth > 0) {
-        console.log('[ScreenPlayer] Watchdog confirmed rendering!');
-        clearInterval(this._watchdog);
-      }
-      
-      checks++;
-      if (checks > 30) clearInterval(this._watchdog);
-    }, 1000);
   }
 
   _tryPlay(retries = 5) {

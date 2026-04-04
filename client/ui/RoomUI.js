@@ -79,13 +79,6 @@ export const RoomUI = {
             <span class="live-indicator text-[10px]" aria-live="polite" aria-atomic="true">
               Synced
             </span>
-            <button 
-              id="btnMicToggle" 
-              class="touch-target flex items-center justify-center text-on-surface-variant hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-              aria-label="Toggle microphone"
-            >
-              <span class="material-symbols-outlined" aria-hidden="true">mic</span>
-            </button>
             ${isHost ? `
               <button 
                 id="btnOpenSource" 
@@ -882,29 +875,7 @@ export const RoomUI = {
       };
     }
 
-    const btnMic = document.querySelector('#btnMicToggle');
-    if (btnMic) {
-      const micIcon = btnMic.querySelector('.material-symbols-outlined');
-      const isMuted = roomManager.voiceChat?.isMuted;
-      if (micIcon) {
-        micIcon.textContent = isMuted ? 'mic_off' : 'mic';
-      }
-      if (roomManager.micPermissionDenied) {
-        btnMic.disabled = true;
-        btnMic.classList.add('opacity-40', 'cursor-not-allowed');
-        btnMic.setAttribute('aria-label', 'Microphone permission denied');
-      }
-      btnMic.onclick = () => {
-        roomManager.toggleMicMute();
-        const icon = btnMic.querySelector('.material-symbols-outlined');
-        if (icon) {
-          icon.textContent = roomManager.voiceChat.isMuted ? 'mic_off' : 'mic';
-        }
-      };
-    }
-
     const btnSource = document.querySelector('#btnOpenSource');
-    console.log('[RoomUI] btnOpenSource exists:', !!btnSource, 'isHost:', roomManager.participants.find(p => p.userId === roomManager.userId || p.id === roomManager.userId)?.isHost);
     if (btnSource) {
       btnSource.onclick = () => {
         console.log('[RoomUI] btnOpenSource clicked, setting currentTab to source');

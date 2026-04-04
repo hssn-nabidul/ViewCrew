@@ -62,6 +62,9 @@ jobs:
         env:
           PORT: 3000
 
+      - name: Wait for backend to be ready
+        run: npx wait-on http://localhost:3000/health --timeout 30000
+
       - name: Run E2E tests
         run: npm run test:e2e
         env:

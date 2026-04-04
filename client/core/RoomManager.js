@@ -444,6 +444,7 @@ export class RoomManager {
       this.socket.off('user-speaking');
       this.socket.off('leave-room');
       this.socket.off('disconnect');
+      this.socket.disconnect();
     }
     
     if (this.peerManager) {

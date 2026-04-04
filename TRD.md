@@ -81,7 +81,7 @@ This document defines the technical requirements, constraints, and specification
 
 **TR-ROOM-03:** Rooms shall be stored in-memory on the server as a Map object with the room ID as key.
 
-**TR-ROOM-04:** A room shall be automatically deleted from memory 30 minutes after the last user disconnects.
+**TR-ROOM-04:** A room shall be automatically deleted from memory 60 seconds after the last user disconnects.
 
 **TR-ROOM-05:** The shareable room URL format shall be: `https://[domain]/room/[roomId]`
 

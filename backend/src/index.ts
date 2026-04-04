@@ -74,7 +74,7 @@ app.use(cors({
   origin: corsOrigins,
   credentials: true
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10kb' }));
 
 // Rate limiting for API endpoints
 const apiLimiter = rateLimit({
@@ -90,8 +90,16 @@ const roomLimiter = rateLimit({
   message: { error: 'Too many room operations, please slow down.' }
 });
 
+// Stricter rate limit for join attempts (prevents room ID brute force)
+const joinLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20, // limit each IP to 20 join attempts per minute
+  message: { error: 'Too many join attempts, please slow down.' }
+});
+
 app.use('/api/', apiLimiter);
 app.use('/api/rooms', roomLimiter);
+app.use('/api/rooms/:id/join', joinLimiter);
 
 // Rate limiting for PeerJS signaling endpoint
 const peerLimiter = rateLimit({
@@ -162,12 +170,12 @@ process.on('SIGINT', shutdown);
 // Global unhandled error handlers
 process.on('unhandledRejection', (reason: unknown) => {
   console.error('[Server] Unhandled Promise Rejection:', reason);
-  process.exit(1);
+  // Log and continue — don't crash the server
 });
 
 process.on('uncaughtException', (error: Error) => {
   console.error('[Server] Uncaught Exception:', error);
-  process.exit(1);
+  // Log and continue — don't crash the server
 });
 
 // Global Express error handler (must be after all routes)

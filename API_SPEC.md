@@ -168,19 +168,6 @@ socket.emit("send-reaction", {
 
 ---
 
-### `ping-sync`
-Client requests current server-side playback state (used for drift correction).
-
-```javascript
-socket.emit("ping-sync", { roomId: "ab3k9x" }, (response) => {
-  // response.time = host's current playback time
-  // response.isPlaying = bool
-  // response.serverTimestamp = Date.now() at time of response
-});
-```
-
----
-
 ## 4. Server → Client Events
 
 ### `room-state`
@@ -328,7 +315,7 @@ socket.on("error", (data) => {
 | Code | HTTP Equivalent | Description |
 |---|---|---|
 | `ROOM_NOT_FOUND` | 404 | Room ID does not exist |
-| `ROOM_FULL` | 429 | Room already has 6 users |
+| `ROOM_FULL` | 429 | Room already has 4 users |
 | `NOT_HOST` | 403 | Sync event from non-host rejected |
 | `INVALID_INPUT` | 400 | Malformed event payload |
 | `SERVER_FULL` | 503 | Server at capacity |

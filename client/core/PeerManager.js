@@ -132,24 +132,34 @@ export class PeerManager {
           OfferToReceiveVideo: type === 'screen'
         }
       },
-      sdpTransform: isMobile ? (sdp) => {
-        const h264Regex = /(a=rtpmap:\d+ H264\/\d+)/;
-        const match = sdp.match(h264Regex);
-        if (match) {
-          const payloadType = match[0].match(/\d+/)[0];
-          sdp = sdp.replace(/(m=video \d+ [A-Z]+\/TLS\/RTP\/SAVPF )(.+)/, (match, prefix, payloads) => {
-            const payloadList = payloads.split(' ');
-            const h264Index = payloadList.indexOf(payloadType);
-            if (h264Index > 0) {
-              payloadList.splice(h264Index, 1);
-              payloadList.unshift(payloadType);
-              return prefix + payloadList.join(' ');
-            }
-            return match;
-          });
+      sdpTransform: (sdp) => {
+        // Inject high bitrate constraints for screen share
+        if (type === 'screen') {
+          sdp = sdp.replace(/b=AS:30/, 'b=AS:2500');
+          sdp = sdp.replace(/b=TIAS:384000/, 'b=TIAS:8000000');
+          sdp = sdp.replace(/a=mid:video/, 'a=mid:video\nb=AS:2500');
+        }
+        
+        // On mobile, prioritize H264 for better compatibility
+        if (isMobile) {
+          const h264Regex = /(a=rtpmap:\d+ H264\/\d+)/;
+          const match = sdp.match(h264Regex);
+          if (match) {
+            const payloadType = match[0].match(/\d+/)[0];
+            sdp = sdp.replace(/(m=video \d+ [A-Z]+\/TLS\/RTP\/SAVPF )(.+)/, (match, prefix, payloads) => {
+              const payloadList = payloads.split(' ');
+              const h264Index = payloadList.indexOf(payloadType);
+              if (h264Index > 0) {
+                payloadList.splice(h264Index, 1);
+                payloadList.unshift(payloadType);
+                return prefix + payloadList.join(' ');
+              }
+              return match;
+            });
+          }
         }
         return sdp;
-      } : undefined
+      }
     };
 
     const call = this.peer.call(remoteUserId, stream, options);

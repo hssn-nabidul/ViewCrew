@@ -64,7 +64,7 @@ export const RoomUI = {
               <span class="material-symbols-outlined" aria-hidden="true">close</span>
             </button>
             <div class="text-lg md:text-xl font-black tracking-tighter text-primary">ViewCrew</div>
-            <div class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-white/5 rounded-lg border border-white/5">
+            <div class="flex items-center gap-1.5 px-2.5 py-1 bg-white/5 rounded-lg border border-white/5">
               <span class="text-[10px] font-mono font-bold tracking-widest text-on-surface-variant">${roomId}</span>
               <button 
                 id="btnCopyRoomCode" 

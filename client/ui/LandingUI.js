@@ -17,14 +17,14 @@ export const LandingUI = {
           </nav>
         </header>
 
-        <main class="flex-1 flex items-center justify-center pt-16">
-          <section class="relative w-full min-h-[calc(100vh-64px)] flex items-center justify-center overflow-hidden px-4 py-8 md:py-12">
+        <main class="flex-1 flex flex-col items-center justify-center pt-16 pb-8">
+          <section class="relative w-full flex items-center justify-center overflow-visible px-4 py-8 md:py-12">
             <div class="absolute inset-0 z-0 bg-[radial-gradient(circle_at_center,rgba(229,9,20,0.12)_0%,transparent_60%)] pointer-events-none" aria-hidden="true"></div>
             <div class="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,rgba(229,9,20,0.05)_0%,transparent_50%)] pointer-events-none" aria-hidden="true"></div>
             
             <div class="relative z-10 w-full max-w-md animate-fade-in">
               <div class="text-center mb-8 md:mb-10 space-y-4">
-                <h1 class="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tighter leading-[1.1]">
+                <h1 class="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black tracking-tighter leading-[1.1]">
                   Watch Together.<br/>
                   <span class="text-primary">Perfectly Synced.</span>
                 </h1>

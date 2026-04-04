@@ -119,6 +119,17 @@ Navigate to `http://localhost:5173` in your browser. Create a room or join an ex
    - `VITE_API_URL` = your Render backend URL (e.g. `https://viewcrew-backend.onrender.com`)
 5. Deploy — Vercel reads `client/vercel.json` automatically
 
+#### Frontend → [Netlify](https://netlify.com) (Alternative)
+
+1. Go to [Netlify Dashboard](https://app.netlify.com) → Add new site → Import an existing project
+2. Connect your GitHub repo
+3. Set **Base directory** to `client`
+4. Build command: `npm run build`
+5. Publish directory: `client/dist`
+6. Add environment variable:
+   - `VITE_API_URL` = your Render backend URL
+7. Deploy — Netlify reads `netlify.toml` automatically
+
 ### Manual Deploy
 
 #### Backend (Render / any Node host)

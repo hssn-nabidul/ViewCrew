@@ -942,10 +942,12 @@ export const RoomUI = {
           videoControls.style.pointerEvents = 'none';
         }, 3000);
       };
+      videoSection._showControls = showControls;
       videoSection.onclick = showControls;
       videoSection.onmousemove = showControls;
       videoSection.ontouchstart = showControls;
       if (videoContainer) {
+        videoContainer._showControls = showControls;
         videoContainer.ontouchstart = showControls;
       }
       document.addEventListener('show-video-controls', showControls);
@@ -1011,10 +1013,19 @@ export const RoomUI = {
       btnMute.onclick = (e) => {
         e.stopPropagation();
         const player = roomManager.syncEngine.player;
-        if (player && player.video) {
-          player.video.muted = !player.video.muted;
-          document.querySelector('#volIcon').textContent = player.video.muted ? 'volume_off' : 'volume_up';
+        if (!player) return;
+
+        const isMuted = player.isMuted || false;
+        const newMuted = !isMuted;
+
+        if (player.video) {
+          player.video.muted = newMuted;
+        } else if (player.player && typeof player.player.setVolume === 'function') {
+          player.player.setVolume(newMuted ? 0 : 100);
         }
+
+        player.isMuted = newMuted;
+        document.querySelector('#volIcon').textContent = newMuted ? 'volume_off' : 'volume_up';
       };
     }
 
@@ -1184,6 +1195,21 @@ export const RoomUI = {
     // Return cleanup function to remove listeners
     return () => {
       cancelAnimationFrame(RoomUI.seekAnimationFrame);
+      
+      // Clean up video control listeners
+      const vs = document.querySelector('#video-stage');
+      const vc = document.querySelector('#video-container');
+      if (vs && vs._showControls) {
+        vs.onclick = null;
+        vs.onmousemove = null;
+        vs.ontouchstart = null;
+        document.removeEventListener('show-video-controls', vs._showControls);
+        delete vs._showControls;
+      }
+      if (vc && vc._showControls) {
+        vc.ontouchstart = null;
+        delete vc._showControls;
+      }
     };
   },
 
@@ -1221,7 +1247,10 @@ export const RoomUI = {
     };
     const emoji = emojiMap[data.emojiId] || data.emojiId;
     const r = document.createElement('div');
-    r.className = 'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-6xl animate-bounce pointer-events-none z-50';
+    const leftOffset = 20 + Math.random() * 60;
+    r.className = 'emoji-reaction';
+    r.style.left = `${leftOffset}%`;
+    r.style.bottom = '20%';
     r.textContent = emoji;
     container.appendChild(r);
     setTimeout(() => r.remove(), 2000);

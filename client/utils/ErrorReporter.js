@@ -65,8 +65,6 @@ export class ErrorReporter {
       return;
     }
 
-    const url = this.dsn.replace(/\/\/([^@]+)@/, '//$1@sentry.io/');
-    const projectId = url.split('/').pop();
     const dsnParts = this.dsn.match(/\/\/(?<key>[^@]+)@(?<host>[^/]+)\/(?<id>\d+)/);
 
     if (!dsnParts) return;

@@ -9,6 +9,13 @@ import { ReactionManager } from './utils/ReactionManager';
 import { ErrorBoundary } from './utils/ErrorBoundary';
 import { ErrorReporter } from './utils/ErrorReporter';
 
+// Suppress console.log/warn in production (keep errors)
+if (import.meta.env.PROD && import.meta.env.VITE_DEBUG !== 'true') {
+  console.log = () => {};
+  console.warn = () => {};
+  console.info = () => {};
+}
+
 const errorBoundary = new ErrorBoundary();
 errorBoundary.init();
 

@@ -5,6 +5,9 @@ export default {
     "./main.js",
     "./ui/**/*.js",
     "./players/**/*.js",
+    "./core/**/*.js",
+    "./utils/**/*.js",
+    "./media/**/*.js",
   ],
   darkMode: 'class',
   theme: {

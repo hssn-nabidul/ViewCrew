@@ -552,11 +552,6 @@ export class RoomManager {
   destroy() {
     console.log('[RoomManager] Cleaning up resources...');
     
-    if (this._refreshTimeout) {
-      clearTimeout(this._refreshTimeout);
-      this._refreshTimeout = null;
-    }
-    
     this._refreshTimeouts.forEach(id => clearTimeout(id));
     this._refreshTimeouts = [];
     

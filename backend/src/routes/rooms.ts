@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { createHash } from 'crypto';
+import type { Server as IOServer } from 'socket.io';
 import { Room, Participant, CreateRoomResponse, RoomInfoResponse, JoinRoomResponse, ParticipantListResponse, ApiError } from '../models/room';
 
 const router = Router();
@@ -8,8 +9,15 @@ const router = Router();
 // In-memory room store
 const rooms = new Map<string, Room>();
 
+// Socket.IO server instance (injected from index.ts)
+let io: IOServer | null = null;
+
+export function setSocketServer(socketServer: IOServer) {
+  io = socketServer;
+}
+
 // Max participants per room
-const MAX_PARTICIPANTS = 4;
+export const MAX_PARTICIPANTS = 4;
 
 // Generate 6-char alphanumeric room ID using crypto
 function generateRoomId(): string {
@@ -327,6 +335,9 @@ router.post('/:id/leave', (req: Request, res: Response) => {
         newHost.isHost = true;
         room.hostId = newHost.id;
         console.log(`[Room] Host transferred to ${newHost.displayName} in room ${room.id}`);
+        if (io) {
+          io.to(room.id).emit('host-changed', { newHostId: newHost.id, displayName: newHost.displayName });
+        }
       }
     } else {
       // Schedule room destruction
@@ -334,6 +345,11 @@ router.post('/:id/leave', (req: Request, res: Response) => {
     }
   } else if (room.participants.size === 0) {
     scheduleRoomDestroy(room);
+  }
+  
+  // Notify other participants via WebSocket
+  if (io) {
+    io.to(room.id).emit('user-left', { userId: participantId, displayName: participant.displayName });
   }
   
   res.json({ success: true });
@@ -390,6 +406,4 @@ router.get('/:id/participants', (req: Request, res: Response) => {
   res.json(response);
 });
 
-// Export for use by other modules
-export { MAX_PARTICIPANTS };
 export default router;

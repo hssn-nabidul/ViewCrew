@@ -1,6 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import { Room, Participant } from '../models/room';
-import { getRoom } from '../routes/rooms';
+import { getRoom, addParticipantToRoom, removeParticipantFromRoom, MAX_PARTICIPANTS } from '../routes/rooms';
 import { createRateLimiter, SocketRateLimiter } from '../middleware/rateLimiter';
 import {
   validateRoomId,
@@ -107,7 +107,7 @@ export function setupSocketHandlers(io: Server): void {
         let participant = room.participants.get(userId);
         if (!participant) {
           // Auto-add participant if not already in room (e.g., direct URL navigation)
-          if (room.participants.size >= 4) {
+          if (room.participants.size >= MAX_PARTICIPANTS) {
             socket.emit('error', { code: 'ROOM_FULL', message: 'Room is full' });
             return;
           }
@@ -206,8 +206,10 @@ export function setupSocketHandlers(io: Server): void {
     // WebRTC Signaling handlers
     socket.on('user-speaking', (data: { roomId: string; userId: string; isSpeaking: boolean }) => {
       if (!checkRateLimit(socket, generalLimiter, 'user-speaking')) return;
-      const { roomId, userId, isSpeaking } = data;
-      socket.to(roomId.toUpperCase()).emit('user-speaking', { userId, isSpeaking });
+      const normalizedRoomId = validateRoomId(data?.roomId);
+      if (!normalizedRoomId) return;
+      const { userId, isSpeaking } = data;
+      socket.to(normalizedRoomId).emit('user-speaking', { userId, isSpeaking });
     });
 
     // sync-event: Relay playback control from host to viewers
@@ -400,7 +402,7 @@ export function setupSocketHandlers(io: Server): void {
   });
 }
 
-async function handleLeaveRoom(io: Server, socket: Socket, roomId: string, userId: string): Promise<void> {
+function handleLeaveRoom(io: Server, socket: Socket, roomId: string, userId: string): void {
   const room = getRoom(roomId);
   if (!room) return;
   
@@ -408,7 +410,7 @@ async function handleLeaveRoom(io: Server, socket: Socket, roomId: string, userI
   if (!participant) return;
   
   const wasHost = participant.isHost;
-  await socket.leave(roomId);
+  socket.leave(roomId);
   participant.socketId = '';
   socketToRoom.delete(socket.id);
   

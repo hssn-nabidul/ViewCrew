@@ -1,7 +1,8 @@
 export class PlayerInterface {
   constructor(containerId, onEvent) {
     this.containerId = containerId;
-    this.onEvent = onEvent; // (type, data)
+    this.onEvent = onEvent;
+    this.isMuted = false;
   }
 
   // To be implemented by subclasses

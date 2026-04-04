@@ -26,9 +26,12 @@ export class ScreenShare {
         console.log('[ScreenShare] Audio track settings:', settings);
       }
 
-      this.stream.getVideoTracks()[0].onended = () => {
-        this.stop();
-      };
+      const videoTrack = this.stream.getVideoTracks()[0];
+      if (videoTrack) {
+        videoTrack.onended = () => {
+          this.stop();
+        };
+      }
 
       console.log('[ScreenShare] Capture started');
       return this.stream;

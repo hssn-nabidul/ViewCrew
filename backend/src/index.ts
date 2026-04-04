@@ -3,12 +3,11 @@ import { createServer, Server as HttpServer } from 'http';
 import { createServer as createHttpsServer, Server as HttpsServer } from 'https';
 import { Server } from 'socket.io';
 import cors from 'cors';
-import path from 'path';
 import fs from 'fs';
 import rateLimit from 'express-rate-limit';
 import { ExpressPeerServer } from 'peer';
 import helmet from 'helmet';
-import roomsRouter from './routes/rooms';
+import roomsRouter, { setSocketServer } from './routes/rooms';
 import { setupSocketHandlers } from './socket/handlers';
 
 const app = express();
@@ -87,7 +86,7 @@ const apiLimiter = rateLimit({
 // Strict rate limit for room creation/joining
 const roomLimiter = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 10, // limit each IP to 10 room operations per minute
+  max: parseInt(process.env.ROOM_RATE_LIMIT || '10'), // limit each IP to N room operations per minute
   message: { error: 'Too many room operations, please slow down.' }
 });
 
@@ -103,6 +102,7 @@ const peerLimiter = rateLimit({
 app.use('/peerjs', peerLimiter, peerServer);
 
 // API Routes
+setSocketServer(io);
 app.use('/api/rooms', roomsRouter);
 
 // Health check endpoint

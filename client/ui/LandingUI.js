@@ -17,8 +17,8 @@ export const LandingUI = {
           </nav>
         </header>
 
-        <main class="flex-1 overflow-y-auto pt-16">
-          <section class="relative w-full min-h-[calc(100vh-64px)] flex items-center justify-center px-4 py-12 md:py-16">
+        <main class="flex-1 overflow-y-auto">
+          <section class="relative w-full flex flex-col items-center justify-center px-4 py-12 md:py-16">
             <div class="absolute inset-0 z-0 bg-[radial-gradient(circle_at_center,rgba(229,9,20,0.12)_0%,transparent_60%)] pointer-events-none" aria-hidden="true"></div>
             <div class="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,rgba(229,9,20,0.05)_0%,transparent_50%)] pointer-events-none" aria-hidden="true"></div>
             

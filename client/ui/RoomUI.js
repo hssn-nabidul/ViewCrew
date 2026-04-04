@@ -845,7 +845,7 @@ export const RoomUI = {
     if (btnCopyCode) {
       btnCopyCode.onclick = async () => {
         try {
-          await navigator.clipboard.writeText(roomId);
+          await navigator.clipboard.writeText(roomManager.roomId);
           const icon = btnCopyCode.querySelector('.material-symbols-outlined');
           if (icon) {
             icon.textContent = 'check';
@@ -858,7 +858,7 @@ export const RoomUI = {
         } catch {
           // Fallback for older browsers
           const textArea = document.createElement('textarea');
-          textArea.value = roomId;
+          textArea.value = roomManager.roomId;
           document.body.appendChild(textArea);
           textArea.select();
           document.execCommand('copy');

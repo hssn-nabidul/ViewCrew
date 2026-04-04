@@ -28,7 +28,7 @@
   }
 
   body {
-    @apply bg-background text-on-surface font-body antialiased selection:bg-primary/30 overflow-hidden min-h-screen;
+    @apply bg-background text-on-surface font-body antialiased selection:bg-primary/30 min-h-screen;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

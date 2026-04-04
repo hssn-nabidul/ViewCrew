@@ -1,7 +1,7 @@
 export const LandingUI = {
   render: (displayName) => {
     return `
-      <div class="bg-background text-on-surface font-body antialiased h-screen flex flex-col overflow-hidden">
+      <div class="bg-background text-on-surface font-body antialiased min-h-screen flex flex-col">
         <header class="fixed top-0 left-0 right-0 z-50 bg-black/70 backdrop-blur-xl border-b border-white/5">
           <nav class="flex items-center justify-between px-4 md:px-6 py-3 md:py-4 max-w-7xl mx-auto" role="navigation" aria-label="Main navigation">
             <a href="/" class="text-xl md:text-2xl font-black tracking-tighter text-primary" aria-label="ViewCrew Home">
@@ -17,8 +17,8 @@ export const LandingUI = {
           </nav>
         </header>
 
-        <main class="flex-1 overflow-y-auto">
-          <section class="relative w-full flex flex-col items-center justify-center px-4 py-12 md:py-16">
+        <main class="flex-1 pt-20 md:pt-24 pb-8">
+          <section class="relative w-full flex flex-col items-center px-4 py-8 md:py-12">
             <div class="absolute inset-0 z-0 bg-[radial-gradient(circle_at_center,rgba(229,9,20,0.12)_0%,transparent_60%)] pointer-events-none" aria-hidden="true"></div>
             <div class="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,rgba(229,9,20,0.05)_0%,transparent_50%)] pointer-events-none" aria-hidden="true"></div>
             
